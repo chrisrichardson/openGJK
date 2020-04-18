@@ -42,16 +42,6 @@
 #define SAMESIGN(a, b) ((a > 0) == (b > 0))
 
 /**
- * @brief Structure of a body.
- */
-class Body
-{
-public:
-  // List of points
-  Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor> coord;
-};
-
-/**
  * @brief Structure for a simplex.
  */
 class Simplex
@@ -60,7 +50,7 @@ public:
   int nvrtx;
   Eigen::Matrix<double, 4, 3, Eigen::RowMajor> vrtx;
   int wids[4];
-  double lambdas[4];
+  Eigen::Vector4d lambdas;
   // Eigen::Matrix<double, 4, 3, Eigen::RowMajor> p;
   // Eigen::Matrix<double, 4, 3, Eigen::RowMajor>  q;
 };
@@ -301,6 +291,289 @@ void S2D(Simplex& s, Eigen::Vector3d& vv)
     vv += s.lambdas[i] * s.vrtx.row(i);
 }
 //-------------------------------------------------------
+
+/**
+ * @brief Finds point of minimum norm of 3-simplex. Robust, but slower, version
+ * of algorithm presented in paper.
+ */
+inline static void S3D(Simplex& s, Eigen::Vector3d& vv)
+{
+  int FacetsTest[4] = {1, 1, 1, 1};
+  int TrianglesToTest[9] = {3, 3, 3, 1, 2, 2, 0, 0, 1};
+  int nclosestS = 0;
+  int firstaux = 0;
+  int secondaux = 0;
+  int Flag_sAuxused = 0;
+  Eigen::Vector3d v, vtmp;
+  double B[4];
+  double tmplamda[4] = {0, 0, 0, 0};
+  double sqdist_tmp = 0;
+  double detM;
+  double inv_detM;
+#ifdef ADAPTIVEFP
+  double o[3] = {0};
+#endif
+
+  Eigen::Vector3d a = s.vrtx.row(3);
+  Eigen::Vector3d b = s.vrtx.row(2);
+  Eigen::Vector3d c = s.vrtx.row(1);
+  Eigen::Vector3d d = s.vrtx.row(0);
+
+#ifndef ADAPTIVEFP
+  B[0] = -1
+         * (b[0] * c[1] * d[2] + b[1] * c[2] * d[0] + b[2] * c[0] * d[1]
+            - b[2] * c[1] * d[0] - b[1] * c[0] * d[2] - b[0] * c[2] * d[1]);
+  B[1] = +1
+         * (a[0] * c[1] * d[2] + a[1] * c[2] * d[0] + a[2] * c[0] * d[1]
+            - a[2] * c[1] * d[0] - a[1] * c[0] * d[2] - a[0] * c[2] * d[1]);
+  B[2] = -1
+         * (a[0] * b[1] * d[2] + a[1] * b[2] * d[0] + a[2] * b[0] * d[1]
+            - a[2] * b[1] * d[0] - a[1] * b[0] * d[2] - a[0] * b[2] * d[1]);
+  B[3] = +1
+         * (a[0] * b[1] * c[2] + a[1] * b[2] * c[0] + a[2] * b[0] * c[1]
+            - a[2] * b[1] * c[0] - a[1] * b[0] * c[2] - a[0] * b[2] * c[1]);
+  detM = B[0] + B[1] + B[2] + B[3];
+#else
+  B[0] = orient3d(o, b, c, d);
+  B[1] = orient3d(a, o, c, d);
+  B[2] = orient3d(a, b, o, d);
+  B[3] = orient3d(a, b, c, o);
+  detM = orient3d(a, b, c, d);
+#endif
+
+  /* Test if sign of ABCD is equal to the signes of the auxiliary simplices */
+  double eps = 1e-13;
+  if (fabs(detM) < eps)
+  {
+    if (fabs(B[2]) < eps && fabs(B[3]) < eps)
+      FacetsTest[1] = 0; /* A = B. Test only ACD */
+    else if (fabs(B[1]) < eps && fabs(B[3]) < eps)
+      FacetsTest[2] = 0; /* A = C. Test only ABD */
+    else if (fabs(B[1]) < eps && fabs(B[2]) < eps)
+      FacetsTest[3] = 0; /* A = D. Test only ABC */
+    else if (fabs(B[0]) < eps && fabs(B[3]) < eps)
+      FacetsTest[1] = 0; /* B = C. Test only ACD */
+    else if (fabs(B[0]) < eps && fabs(B[2]) < eps)
+      FacetsTest[1] = 0; /* B = D. Test only ABD */
+    else if (fabs(B[0]) < eps && fabs(B[1]) < eps)
+      FacetsTest[2] = 0; /* C = D. Test only ABC */
+    else
+    {
+      for (int i = 0; i < 4; i++)
+        FacetsTest[i] = 0; /* Any other case. Test ABC, ABD, ACD */
+    }
+  }
+  else
+  {
+    for (int i = 0; i < 4; ++i)
+      FacetsTest[i] = SAMESIGN(detM, B[i]);
+  }
+
+  /* Compare signed volumes and compute barycentric coordinates */
+  if (FacetsTest[0] + FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 4)
+  {
+    /* All signs are equal, therefore the origin is inside the simplex */
+    inv_detM = 1 / detM;
+    s.lambdas[3] = B[0] * inv_detM;
+    s.lambdas[2] = B[1] * inv_detM;
+    s.lambdas[1] = B[2] * inv_detM;
+    s.lambdas[0] = 1 - s.lambdas[1] - s.lambdas[2] - s.lambdas[3];
+    s.wids[0] = 0;
+    s.wids[1] = 1;
+    s.wids[2] = 2;
+    s.wids[3] = 3;
+    s.nvrtx = 4;
+  }
+  else if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 0)
+  {
+    /* There are three facets facing the origin  */
+    Simplex sTmp;
+    sqdist_tmp = -1;
+    int sID[4] = {0, 0, 0, 0};
+    for (int i = 0; i < 3; ++i)
+    {
+      sTmp.nvrtx = 3;
+      /* Assign coordinates to simplex */
+      for (int k = 0; k < sTmp.nvrtx; ++k)
+      {
+        const int vtxid = TrianglesToTest[i + (k * 3)];
+        sTmp.vrtx.row(2 - k) = s.vrtx.row(vtxid);
+      }
+      /* ... and call S2D  */
+      S2D(sTmp, v);
+      /* ... compute aux squared distance */
+      vtmp.setZero();
+      for (int l = 0; l < sTmp.nvrtx; ++l)
+        vtmp += sTmp.lambdas[l] * sTmp.vrtx.row(l);
+
+      if (vtmp.squaredNorm() < sqdist_tmp)
+      {
+        sqdist_tmp = vtmp.squaredNorm();
+        nclosestS = sTmp.nvrtx;
+        for (int l = 0; l < nclosestS; ++l)
+        {
+          sID[l] = TrianglesToTest[i + (sTmp.wids[l] * 3)];
+          tmplamda[l] = sTmp.lambdas[l];
+        }
+      }
+    }
+
+    Eigen::Matrix<double, 4, 3, Eigen::RowMajor> tmpscoo1 = s.vrtx;
+
+    /* Store closest simplex */
+    s.nvrtx = nclosestS;
+    for (int i = 0; i < s.nvrtx; ++i)
+    {
+      s.vrtx.row(nclosestS - 1 - i) = tmpscoo1.row(sID[i]);
+      s.lambdas[i] = tmplamda[i];
+      s.wids[nclosestS - 1 - i] = sID[i];
+    }
+  }
+  else if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 1)
+  {
+    /* There are two   facets facing the origin, need to find the closest.   */
+    Simplex sTmp;
+    sTmp.nvrtx = 3;
+
+    if (FacetsTest[1] == 0)
+    {
+      /* ... Test facet ACD  */
+      sTmp.vrtx.row(0) = s.vrtx.row(0);
+      sTmp.vrtx.row(1) = s.vrtx.row(1);
+      sTmp.vrtx.row(2) = s.vrtx.row(3);
+      /* ... and call S2D  */
+      S2D(sTmp, v);
+      /* ... compute aux squared distance */
+      vtmp.setZero();
+      for (int i = 0; i < sTmp.nvrtx; ++i)
+        vtmp += sTmp.lambdas[i] * sTmp.vrtx.row(i);
+
+      sqdist_tmp = vtmp.squaredNorm();
+      Flag_sAuxused = 1;
+      firstaux = 0;
+    }
+    if (FacetsTest[2] == 0)
+    {
+      /* ... Test facet ABD  */
+      if (Flag_sAuxused == 0)
+      {
+        sTmp.vrtx.row(0) = s.vrtx.row(0);
+        sTmp.vrtx.row(1) = s.vrtx.row(2);
+        sTmp.vrtx.row(2) = s.vrtx.row(3);
+        /* ... and call S2D  */
+        S2D(sTmp, v);
+        /* ... compute aux squared distance */
+
+        vtmp.setZero();
+        for (int i = 0; i < sTmp.nvrtx; ++i)
+          vtmp += sTmp.lambdas[i] * sTmp.vrtx.row(i);
+
+        sqdist_tmp = vtmp.squaredNorm();
+        firstaux = 1;
+      }
+      else
+      {
+        s.nvrtx = 3;
+        s.vrtx.row(1) = s.vrtx.row(2);
+        s.vrtx.row(2) = s.vrtx.row(3);
+        /* ... and call S2D itself */
+        S2D(s, v);
+        secondaux = 1;
+      }
+    }
+
+    if (FacetsTest[3] == 0)
+    {
+      /* ... Test facet ABC  */
+      s.nvrtx = 3;
+      s.vrtx.row(0) = s.vrtx.row(1);
+      s.vrtx.row(1) = s.vrtx.row(2);
+      s.vrtx.row(2) = s.vrtx.row(3);
+      /* ... and call S2D  */
+      S2D(s, v);
+      secondaux = 2;
+    }
+    /* Compare outcomes */
+    v.setZero();
+    for (int i = 0; i < s.nvrtx; ++i)
+      v += s.lambdas[i] * s.vrtx.row(i);
+
+    if (v.squaredNorm() < sqdist_tmp)
+    {
+      /* Keep simplex. Need to update sID only*/
+      for (int i = 0; i < s.nvrtx; ++i)
+      {
+        /* Assume that vertex a is always included in sID. */
+        s.wids[s.nvrtx - 1 - i] = TrianglesToTest[secondaux + (s.wids[i] * 3)];
+      }
+    }
+    else
+    {
+      s.nvrtx = sTmp.nvrtx;
+      for (int i = 0; i < s.nvrtx; ++i)
+      {
+        s.vrtx.row(i) = sTmp.vrtx.row(i);
+        s.lambdas[i] = sTmp.lambdas[i];
+        s.wids[sTmp.nvrtx - 1 - i]
+            = TrianglesToTest[firstaux + (sTmp.wids[i] * 3)];
+      }
+    }
+  }
+  else if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 2)
+  {
+    /* Only one facet is facing the origin */
+    if (FacetsTest[1] == 0)
+    {
+      /* The origin projection P faces the facet ACD */
+      s.nvrtx = 3;
+      s.vrtx.row(1) = s.vrtx.row(1);
+      s.vrtx.row(2) = s.vrtx.row(3);
+      S2D(s, v);
+    }
+    else if (FacetsTest[2] == 0)
+    {
+      /* The origin projection P faces the facet ABD */
+      s.nvrtx = 3;
+      s.vrtx.row(1) = s.vrtx.row(2);
+      s.vrtx.row(2) = s.vrtx.row(3);
+      S2D(s, v);
+      /* Keep simplex. Need to update sID only*/
+      for (int i = 2; i < s.nvrtx; ++i)
+      {
+        /* Assume that vertex a is always included in sID. */
+        ++s.wids[i];
+      }
+    }
+    else if (FacetsTest[3] == 0)
+    {
+      /* The origin projection P faces the facet ABC */
+      s.nvrtx = 3;
+      s.vrtx.row(0) = s.vrtx.row(1);
+      s.vrtx.row(1) = s.vrtx.row(2);
+      s.vrtx.row(2) = s.vrtx.row(3);
+      S2D(s, v);
+    }
+  }
+  else
+  {
+    /* The origin projection P faces the facet BCD */
+    s.nvrtx = 3;
+    /* ... and call S2D   */
+    S2D(s, v);
+    /* Keep simplex. Need to update sID only*/
+    for (int i = 0; i < s.nvrtx; ++i)
+    {
+      /* Assume that vertex a is always included in sID. */
+      ++s.wids[i];
+    }
+  }
+
+  vv.setZero();
+  for (int i = 0; i < s.nvrtx; ++i)
+    vv += s.lambdas[i] * s.vrtx.row(i);
+}
+
+//-------------------------------------------------------
 void support(
     Eigen::Vector3d& bs,
     const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& body,
@@ -310,27 +583,15 @@ void support(
   double maxs = (body * v).maxCoeff(&i);
   if (maxs > bs.dot(v))
     bs = body.row(i);
-
-  // double maxs = v.dot(bs);
-  // int better = -1;
-  // for (int i = 0; i < body.rows(); ++i)
-  // {
-  //   double s = v.dot(body.row(i));
-  //   if (s > maxs)
-  //   {
-  //     maxs = s;
-  //     better = i;
-  //   }
-  // }
-
-  // if (better != -1)
-  //   bs = body.row(better);
 }
 //-----------------------------------------------------
 void subalgorithm(Simplex& s, Eigen::Vector3d& v)
 {
   switch (s.nvrtx)
   {
+  case 4:
+    S3D(s, v);
+    break;
   case 3:
     S2D(s, v);
     break;
