@@ -1,3 +1,4 @@
+import opengjkc
 import opengjk
 import numpy as np
 
@@ -13,6 +14,7 @@ for th in np.arange(0, 2*np.pi, 0.01*np.pi):
     x = np.sqrt(2)*np.cos(th)
     y = np.sqrt(2)*np.sin(th)
     z = 0.0
-    d = opengjk.gjk(cube, [[x,y,z]])
-    print(x, y, z, d)
+    d1 = opengjkc.gjk(tri, [[x,y,z]])
+    d2 = opengjk.gjk(tri, [[x,y,z]])
+    print(x, y, z, d1, d2)
 

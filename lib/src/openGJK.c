@@ -45,8 +45,8 @@
  */
 
 #define _CRT_HAS_CXX17 0
-#include <stdio.h>
 #include "openGJK/openGJK.h"
+#include <stdio.h>
 
 /* If instricuted, uses adaptive floating point arithmetics. */
 #ifdef ADAPTIVEFP
@@ -55,34 +55,37 @@
 
 /* If instricuted, compile a mex function for Matlab.  */
 #ifdef MATLABDOESMEXSTUFF
-  #include "mex.h" 
+#include "mex.h"
 #else
-  #define mexPrintf  printf 
+#define mexPrintf printf
 #endif
 
 #ifdef unix
-  #define _isnan(x) isnan(x)
+#define _isnan(x) isnan(x)
 #endif
 
-#define dotProduct(a, b) (a[0]*b[0]+a[1]*b[1]+a[2]*b[2])
+#define dotProduct(a, b) (a[0] * b[0] + a[1] * b[1] + a[2] * b[2])
 
 /**
  * @brief Returns squared vector norm
  */
-double norm2(double *v) {
+double norm2(double* v)
+{
   double n2 = 0;
-  for (int i = 0; i < 3; ++i) 
+  for (int i = 0; i < 3; ++i)
     n2 += v[i] * v[i];
   return n2;
 }
 
 /**
- * @brief Finds point of minimum norm of 1-simplex. Robust, but slower, version of algorithm presented in paper.
+ * @brief Finds point of minimum norm of 1-simplex. Robust, but slower, version
+ * of algorithm presented in paper.
  */
-inline static void S1D(struct simplex * s, double *vv) {
-  int    i = 0;
-  int    indexI = 1;
-  int    FacetsTest[2];  
+inline static void S1D(struct simplex* s, double* vv)
+{
+  int i = 0;
+  int indexI = 1;
+  int FacetsTest[2];
   double det_ap = 0;
   double det_pb = 0;
   double pt = 0;
@@ -92,35 +95,41 @@ inline static void S1D(struct simplex * s, double *vv) {
   double t[3];
   double nu_fabs[3];
 
-  for (i = 0; i < 3; ++i) {
+  for (i = 0; i < 3; ++i)
+  {
     b[i] = s->vrtx[0][i];
     a[i] = s->vrtx[1][i];
     t[i] = b[i] - a[i];
     leng += t[i];
     nu_fabs[i] = fabs(t[i]);
   }
-  
-  if (nu_fabs[0] > nu_fabs[1]) {
+
+  if (nu_fabs[0] > nu_fabs[1])
+  {
     if (nu_fabs[0] > nu_fabs[2])
       indexI = 0;
-    else 
-      indexI = 2;    
+    else
+      indexI = 2;
   }
-  else if (nu_fabs[0] < nu_fabs[1]) {
+  else if (nu_fabs[0] < nu_fabs[1])
+  {
     if (nu_fabs[1] > nu_fabs[2])
       indexI = 1;
     else
       indexI = 2;
   }
-  else if (nu_fabs[0] < nu_fabs[2]) {
+  else if (nu_fabs[0] < nu_fabs[2])
+  {
     indexI = 2;
   }
-  else if (nu_fabs[1] < nu_fabs[2]) {
+  else if (nu_fabs[1] < nu_fabs[2])
+  {
     indexI = 2;
   }
 
   /* Project origin onto the 1D simplex - line */
-  pt = dotProduct(b, t) / (dotProduct(t, t)) * (a[indexI] - b[indexI]) + b[indexI];
+  pt = dotProduct(b, t) / (dotProduct(t, t)) * (a[indexI] - b[indexI])
+       + b[indexI];
 
   /* Compute signed determinants */
   det_ap = a[indexI] - pt;
@@ -130,7 +139,8 @@ inline static void S1D(struct simplex * s, double *vv) {
   FacetsTest[0] = SAMESIGN(t[indexI], -1 * det_ap);
   FacetsTest[1] = SAMESIGN(t[indexI], -1 * det_pb);
 
-  if (FacetsTest[0] + FacetsTest[1] == 2) {
+  if (FacetsTest[0] + FacetsTest[1] == 2)
+  {
     /* The origin is between A and B */
     s->lambdas[0] = det_ap * -1.0 / t[indexI];
     s->lambdas[1] = 1 - s->lambdas[0];
@@ -138,65 +148,72 @@ inline static void S1D(struct simplex * s, double *vv) {
     s->wids[1] = 1;
     s->nvrtx = 2;
   }
-  else if (FacetsTest[0] == 0) {
+  else if (FacetsTest[0] == 0)
+  {
     /* The origin is beyond A */
     s->lambdas[0] = 1;
     s->wids[0] = 0;
     s->nvrtx = 1;
-    for (i = 0; i < 3; ++i) {
+    for (i = 0; i < 3; ++i)
+    {
       s->vrtx[0][i] = s->vrtx[1][i];
     }
   }
-  else {
+  else
+  {
     /* The origin is behind B */
     s->lambdas[0] = 1;
     s->wids[0] = 1;
     s->nvrtx = 1;
   }
-   
-  for (int j = 0; j < 3; ++j) {
+
+  for (int j = 0; j < 3; ++j)
+  {
     vv[j] = 0;
-    for (i = 0; i < s->nvrtx; ++i) {
+    for (i = 0; i < s->nvrtx; ++i)
+    {
       vv[j] += (s->lambdas[i] * s->vrtx[i][j]);
     }
-  } 
+  }
 }
 
 /**
- * @brief Finds point of minimum norm of 2-simplex. Robust, but slower, version of algorithm presented in paper.
+ * @brief Finds point of minimum norm of 2-simplex. Robust, but slower, version
+ * of algorithm presented in paper.
  */
-inline static void S2D(struct simplex * s, double *vv) {
-  int       i;
-  int       k;
-  int       l;
-  int       j;
-  int       indexI = 1;
-  //int       stemp[3];
-  int       FacetsTest[3];
-  int       indexJ[2] = { -1 };
-  double    nu_max = 0;
-  double    inv_detM = 0;
-  double    nnorm_sqrd = 0;
-  double    nnnorm = 0;
-  double    dotNA;
-  double    a[3];
-  double    b[3];
-  double    c[3];
-  double    s21[3];
-  double    s31[3];
-  double    nu_test[3];
-  double    nu_fabs[3];
-  double    B[3];
-  double    n[3];
-  double    v[3];
-  double    vtmp[3];
-  double    pp[3 - 1];
-  double    sa[3 - 1];
-  double    sb[3 - 1];
-  double    sc[3 - 1];
+inline static void S2D(struct simplex* s, double* vv)
+{
+  int i;
+  int k;
+  int l;
+  int j;
+  int indexI = 1;
+  // int       stemp[3];
+  int FacetsTest[3];
+  int indexJ[2] = {-1};
+  double nu_max = 0;
+  double inv_detM = 0;
+  double nnorm_sqrd = 0;
+  double nnnorm = 0;
+  double dotNA;
+  double a[3];
+  double b[3];
+  double c[3];
+  double s21[3];
+  double s31[3];
+  double nu_test[3];
+  double nu_fabs[3];
+  double B[3];
+  double n[3];
+  double v[3];
+  double vtmp[3];
+  double pp[3 - 1];
+  double sa[3 - 1];
+  double sb[3 - 1];
+  double sc[3 - 1];
 
-
-  for (i = 0; i < 3; ++i) {
+  for (i = 0; i < 3; ++i)
+  {
     c[i] = s->vrtx[0][i];
     b[i] = s->vrtx[1][i];
     a[i] = s->vrtx[2][i];
@@ -205,41 +222,54 @@ inline static void S2D(struct simplex * s, double *vv) {
   }
 
   /* Find best axis for projection */
-  k = 1; l = 2;
-  for (i = 0; i < 3; ++i) {
-    nu_test[i] = pow(-1.0, i) * (b[k] * c[l] + a[k] * b[l] + c[k] * a[l] - b[k] * a[l] - c[k] * b[l] - a[k] * c[l]);
-    k = l; l = i;
+  k = 1;
+  l = 2;
+  for (i = 0; i < 3; ++i)
+  {
+    nu_test[i] = pow(-1.0, i)
+                 * (b[k] * c[l] + a[k] * b[l] + c[k] * a[l] - b[k] * a[l]
+                    - c[k] * b[l] - a[k] * c[l]);
+    k = l;
+    l = i;
   }
 
-  for (i = 0; i < 3; ++i) {
+  for (i = 0; i < 3; ++i)
+  {
     nu_fabs[i] = fabs(nu_test[i]);
   }
 
-  if (nu_fabs[0] > nu_fabs[1]) {
-    if (nu_fabs[0] > nu_fabs[2]) {
+  if (nu_fabs[0] > nu_fabs[1])
+  {
+    if (nu_fabs[0] > nu_fabs[2])
+    {
       indexI = 0;
       indexJ[0] = 1;
       indexJ[1] = 2;
     }
-    else {
+    else
+    {
       indexJ[0] = 0;
       indexJ[1] = 1;
       indexI = 2;
     }
   }
-  else if (nu_fabs[0] < nu_fabs[1]) {
-    if (nu_fabs[1] > nu_fabs[2]) {
+  else if (nu_fabs[0] < nu_fabs[1])
+  {
+    if (nu_fabs[1] > nu_fabs[2])
+    {
       indexJ[0] = 0;
       indexI = 1;
       indexJ[1] = 2;
     }
-    else {
+    else
+    {
       indexJ[0] = 0;
       indexJ[1] = 1;
       indexI = 2;
     }
   }
-  else if (nu_fabs[0] < nu_fabs[2]) {
+  else if (nu_fabs[0] < nu_fabs[2])
+  {
     indexJ[0] = 0;
     indexJ[1] = 1;
     indexI = 2;
@@ -247,14 +277,18 @@ inline static void S2D(struct simplex * s, double *vv) {
 
   nu_max = nu_test[indexI];
 
-  k = 1;      l = 2;
-  for (i = 0; i < 3; ++i) {
+  k = 1;
+  l = 2;
+  for (i = 0; i < 3; ++i)
+  {
     n[i] = s21[k] * s31[l] - s21[l] * s31[k];
     nnorm_sqrd += n[i] * n[i];
-    k = l;     l = i;
+    k = l;
+    l = i;
   }
   nnnorm = 1 / sqrt(nnorm_sqrd);
-  for (i = 0; i < 3; ++i) {
+  for (i = 0; i < 3; ++i)
+  {
     n[i] = n[i] * nnnorm;
   }
 
@@ -265,7 +299,7 @@ inline static void S2D(struct simplex * s, double *vv) {
 
   /* Compute signed determinants */
 #ifndef ADAPTIVEFP
-  double    ss[3][3 - 1];
+  double ss[3][3 - 1];
 
   ss[0][0] = sa[0] = a[indexJ[0]];
   ss[0][1] = sa[1] = a[indexJ[1]];
@@ -274,10 +308,12 @@ inline static void S2D(struct simplex * s, double *vv) {
   ss[2][0] = sc[0] = c[indexJ[0]];
   ss[2][1] = sc[1] = c[indexJ[1]];
 
-  k = 1;   l = 2;
-  for (i = 0; i < 3; ++i) {
-    B[i] = pp[0] * ss[k][1] + pp[1] * ss[l][0] + ss[k][0] * ss[l][1] - pp[0] * ss[l][1] - pp[1] * ss[k][0] -
-      ss[l][0] * ss[k][1];
+  k = 1;
+  l = 2;
+  for (i = 0; i < 3; ++i)
+  {
+    B[i] = pp[0] * ss[k][1] + pp[1] * ss[l][0] + ss[k][0] * ss[l][1]
+           - pp[0] * ss[l][1] - pp[1] * ss[k][0] - ss[l][0] * ss[k][1];
     k = l;
     l = i;
   }
@@ -296,17 +332,20 @@ inline static void S2D(struct simplex * s, double *vv) {
 #endif
 
   /* Test if sign of ABC is equal to the signes of the auxiliary simplices */
-  for (i = 0; i < 3; ++i) {
+  for (i = 0; i < 3; ++i)
+  {
     FacetsTest[i] = SAMESIGN(nu_max, B[i]);
   }
 
   // The nan check was not included originally and will be removed in v2.0
-  if (FacetsTest[1] + FacetsTest[2] == 0 || isnan(n[0])) { 
-    struct simplex  sTmp;
+  if (FacetsTest[1] + FacetsTest[2] == 0 || isnan(n[0]))
+  {
+    struct simplex sTmp;
 
     sTmp.nvrtx = 2;
     s->nvrtx = 2;
-    for (i = 0; i < 3; ++i) {
+    for (i = 0; i < 3; ++i)
+    {
 
       sTmp.vrtx[0][i] = s->vrtx[1][i];
       sTmp.vrtx[1][i] = s->vrtx[2][i];
@@ -318,34 +357,43 @@ inline static void S2D(struct simplex * s, double *vv) {
     S1D(&sTmp, v);
     S1D(s, v);
 
-    for (j = 0; j < 3; ++j) {
+    for (j = 0; j < 3; ++j)
+    {
       vtmp[j] = 0;
       v[j] = 0;
-      for (i = 0; i < sTmp.nvrtx; ++i) {
+      for (i = 0; i < sTmp.nvrtx; ++i)
+      {
         vtmp[j] += (sTmp.lambdas[i] * sTmp.vrtx[i][j]);
         v[j] += (s->lambdas[i] * s->vrtx[i][j]);
       }
     }
 
-    if (dotProduct(v, v) < dotProduct(vtmp, vtmp)) {
+    if (dotProduct(v, v) < dotProduct(vtmp, vtmp))
+    {
       /* Keep simplex. Need to update sID only*/
-      for (i = 1; i < s->nvrtx; ++i) {
+      for (i = 1; i < s->nvrtx; ++i)
+      {
         s->wids[i] = s->wids[i] + 1;
       }
     }
-    else {
+    else
+    {
       s->nvrtx = sTmp.nvrtx;
-      for (j = 0; j < 3; ++j) {
-        for (i = 0; i < s->nvrtx; ++i) {
+      for (j = 0; j < 3; ++j)
+      {
+        for (i = 0; i < s->nvrtx; ++i)
+        {
           s->vrtx[i][j] = s->vrtx[i][j];
           s->lambdas[i] = sTmp.lambdas[i];
-          /* No need to convert sID here since sTmp deal with the vertices A and B. ;*/
+          /* No need to convert sID here since sTmp deal with the vertices A and
+           * B. ;*/
           s->wids[i] = sTmp.wids[i];
         }
       }
     }
   }
-  else if ((FacetsTest[0] + FacetsTest[1] + FacetsTest[2]) == 3) {
+  else if ((FacetsTest[0] + FacetsTest[1] + FacetsTest[2]) == 3)
+  {
     /* The origin projections lays onto the triangle */
     inv_detM = 1 / nu_max;
     s->lambdas[0] = B[2] * inv_detM;
@@ -356,75 +404,85 @@ inline static void S2D(struct simplex * s, double *vv) {
     s->wids[2] = 2;
     s->nvrtx = 3;
   }
-  else if (FacetsTest[2] == 0) {
+  else if (FacetsTest[2] == 0)
+  {
     /* The origin projection P faces the segment AB */
     s->nvrtx = 2;
-    for (i = 0; i < 3; ++i) {
+    for (i = 0; i < 3; ++i)
+    {
       s->vrtx[0][i] = s->vrtx[1][i];
       s->vrtx[1][i] = s->vrtx[2][i];
     }
     S1D(s, v);
   }
-  else if (FacetsTest[1] == 0) {
+  else if (FacetsTest[1] == 0)
+  {
     /* The origin projection P faces the segment AC */
     s->nvrtx = 2;
-    for (i = 0; i < 3; ++i) {
+    for (i = 0; i < 3; ++i)
+    {
       s->vrtx[0][i] = s->vrtx[0][i];
       s->vrtx[1][i] = s->vrtx[2][i];
     }
     S1D(s, v);
-    for (i = 1; i < s->nvrtx; ++i) {
+    for (i = 1; i < s->nvrtx; ++i)
+    {
       s->wids[i] = s->wids[i] + 1;
     }
   }
-  else {
+  else
+  {
     /* The origin projection P faces the segment BC */
     s->nvrtx = 2;
     S1D(s, v);
-
   }
-  
-  for ( j = 0; j < 3; ++j) {
+
+  for (j = 0; j < 3; ++j)
+  {
     vv[j] = 0;
-    for (i = 0; i < s->nvrtx; ++i) {
+    for (i = 0; i < s->nvrtx; ++i)
+    {
       vv[j] += (s->lambdas[i] * s->vrtx[i][j]);
     }
   }
 }
 
 /**
- * @brief Finds point of minimum norm of 3-simplex. Robust, but slower, version of algorithm presented in paper.
+ * @brief Finds point of minimum norm of 3-simplex. Robust, but slower, version
+ * of algorithm presented in paper.
  */
-inline static void S3D(struct simplex * s,  double *vv) {
-  int      FacetsTest[4] = { 1,1,1,1 };
-  int      sID[4] = { 0, 0, 0, 0 };
-  int      TrianglesToTest[9] = { 3, 3, 3, 1, 2, 2, 0, 0, 1 };
-  int      i;
-  int      j;
-  int      k;
-  int      l;
-  int      vtxid;
-  int      ndoubts = 0;
-  int      nclosestS = 0;
-  int      firstaux = 0;
-  int      secondaux = 0;
-  int      Flag_sAuxused = 0;
-  double   a[3];
-  double   b[3];
-  double   c[3];
-  double   d[3];
-  double   vtmp[3];
-  double   v[3];
-  double   B[4];
-  double   tmplamda[4] = { 0, 0, 0, 0 };
-  double   tmpscoo1[4][3] = { 0 };
-  double   sqdist_tmp = 0;
-  double   detM;
-  double   inv_detM;
+inline static void S3D(struct simplex* s, double* vv)
+{
+  int FacetsTest[4] = {1, 1, 1, 1};
+  int sID[4] = {0, 0, 0, 0};
+  int TrianglesToTest[9] = {3, 3, 3, 1, 2, 2, 0, 0, 1};
+  int i;
+  int j;
+  int k;
+  int l;
+  int vtxid;
+  int ndoubts = 0;
+  int nclosestS = 0;
+  int firstaux = 0;
+  int secondaux = 0;
+  int Flag_sAuxused = 0;
+  double a[3];
+  double b[3];
+  double c[3];
+  double d[3];
+  double vtmp[3];
+  double v[3];
+  double B[4];
+  double tmplamda[4] = {0, 0, 0, 0};
+  double tmpscoo1[4][3] = {0};
+  double sqdist_tmp = 0;
+  double detM;
+  double inv_detM;
 #ifdef ADAPTIVEFP
-  double  o[3] = { 0 };
+  double o[3] = {0};
 #endif
-  for (i = 0; i < 3; ++i) {
+  for (i = 0; i < 3; ++i)
+  {
     d[i] = s->vrtx[0][i];
     c[i] = s->vrtx[1][i];
     b[i] = s->vrtx[2][i];
@@ -432,10 +490,18 @@ inline static void S3D(struct simplex * s,  double *vv) {
   }
 
 #ifndef ADAPTIVEFP
-  B[0] = -1 * (b[0] * c[1] * d[2] + b[1] * c[2] * d[0] + b[2] * c[0] * d[1] - b[2] * c[1] * d[0] - b[1] * c[0] * d[2] - b[0] * c[2] * d[1]);
-  B[1] = +1 * (a[0] * c[1] * d[2] + a[1] * c[2] * d[0] + a[2] * c[0] * d[1] - a[2] * c[1] * d[0] - a[1] * c[0] * d[2] - a[0] * c[2] * d[1]);
-  B[2] = -1 * (a[0] * b[1] * d[2] + a[1] * b[2] * d[0] + a[2] * b[0] * d[1] - a[2] * b[1] * d[0] - a[1] * b[0] * d[2] - a[0] * b[2] * d[1]);
-  B[3] = +1 * (a[0] * b[1] * c[2] + a[1] * b[2] * c[0] + a[2] * b[0] * c[1] - a[2] * b[1] * c[0] - a[1] * b[0] * c[2] - a[0] * b[2] * c[1]);
+  B[0] = -1
+         * (b[0] * c[1] * d[2] + b[1] * c[2] * d[0] + b[2] * c[0] * d[1]
+            - b[2] * c[1] * d[0] - b[1] * c[0] * d[2] - b[0] * c[2] * d[1]);
+  B[1] = +1
+         * (a[0] * c[1] * d[2] + a[1] * c[2] * d[0] + a[2] * c[0] * d[1]
+            - a[2] * c[1] * d[0] - a[1] * c[0] * d[2] - a[0] * c[2] * d[1]);
+  B[2] = -1
+         * (a[0] * b[1] * d[2] + a[1] * b[2] * d[0] + a[2] * b[0] * d[1]
+            - a[2] * b[1] * d[0] - a[1] * b[0] * d[2] - a[0] * b[2] * d[1]);
+  B[3] = +1
+         * (a[0] * b[1] * c[2] + a[1] * b[2] * c[0] + a[2] * b[0] * c[1]
+            - a[2] * b[1] * c[0] - a[1] * b[0] * c[2] - a[0] * b[2] * c[1]);
   detM = B[0] + B[1] + B[2] + B[3];
 #else
   B[0] = orient3d(o, b, c, d);
@@ -461,19 +527,21 @@ inline static void S3D(struct simplex * s,  double *vv) {
       FacetsTest[1] = 0; /* B = D. Test only ABD */
     else if (fabs(B[0]) < eps && fabs(B[1]) < eps)
       FacetsTest[2] = 0; /* C = D. Test only ABC */
-    else {
+    else
+    {
       for (i = 0; i < 4; i++)
         FacetsTest[i] = 0; /* Any other case. Test ABC, ABD, ACD */
     }
   }
-  else 
+  else
   {
-    for (i = 0; i < 4; ++i) 
+    for (i = 0; i < 4; ++i)
       FacetsTest[i] = SAMESIGN(detM, B[i]);
   }
 
   /* Compare signed volumes and compute barycentric coordinates */
-  if (FacetsTest[0] + FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 4) {
+  if (FacetsTest[0] + FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 4)
+  {
     /* All signs are equal, therefore the origin is inside the simplex */
     inv_detM = 1 / detM;
     s->lambdas[3] = B[0] * inv_detM;
@@ -486,73 +554,90 @@ inline static void S3D(struct simplex * s,  double *vv) {
     s->wids[3] = 3;
     s->nvrtx = 4;
   }
-  else if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 0) {
+  else if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 0)
+  {
     /* There are three facets facing the origin  */
     ndoubts = 3;
 
-    struct simplex  sTmp;
+    struct simplex sTmp;
 
-    for (i = 0; i < ndoubts; ++i) {
+    for (i = 0; i < ndoubts; ++i)
+    {
       sTmp.nvrtx = 3;
       /* Assign coordinates to simplex */
-      for (k = 0; k < sTmp.nvrtx; ++k) {
+      for (k = 0; k < sTmp.nvrtx; ++k)
+      {
         vtxid = TrianglesToTest[i + (k * 3)];
-        for (j = 0; j < 3; ++j) {
+        for (j = 0; j < 3; ++j)
+        {
           sTmp.vrtx[2 - k][j] = s->vrtx[vtxid][j];
         }
       }
       /* ... and call S2D  */
       S2D(&sTmp, v);
       /* ... compute aux squared distance */
-      for (j = 0; j < 3; ++j) {
+      for (j = 0; j < 3; ++j)
+      {
         vtmp[j] = 0;
-        for (l = 0; l < sTmp.nvrtx; ++l) {
+        for (l = 0; l < sTmp.nvrtx; ++l)
+        {
           vtmp[j] += sTmp.lambdas[l] * (sTmp.vrtx[l][j]);
         }
       }
 
-      if (i == 0) {
+      if (i == 0)
+      {
         sqdist_tmp = dotProduct(vtmp, vtmp);
         nclosestS = sTmp.nvrtx;
-        for (l = 0; l < nclosestS; ++l) {
+        for (l = 0; l < nclosestS; ++l)
+        {
           sID[l] = TrianglesToTest[i + (sTmp.wids[l] * 3)];
           tmplamda[l] = sTmp.lambdas[l];
         }
       }
-      else if (dotProduct(vtmp, vtmp) < sqdist_tmp) {
+      else if (dotProduct(vtmp, vtmp) < sqdist_tmp)
+      {
         sqdist_tmp = dotProduct(vtmp, vtmp);
         nclosestS = sTmp.nvrtx;
-        for (l = 0; l < nclosestS; ++l) {
+        for (l = 0; l < nclosestS; ++l)
+        {
           sID[l] = TrianglesToTest[i + (sTmp.wids[l] * 3)];
           tmplamda[l] = sTmp.lambdas[l];
         }
       }
     }
 
-    for (i = 0; i < 4; ++i) {
-      for (j = 0; j < 3; ++j) {
+    for (i = 0; i < 4; ++i)
+    {
+      for (j = 0; j < 3; ++j)
+      {
         tmpscoo1[i][j] = s->vrtx[i][j];
       }
     }
 
     /* Store closest simplex */
     s->nvrtx = nclosestS;
-    for (i = 0; i < s->nvrtx; ++i) {
-      for (j = 0; j < 3; ++j) {
+    for (i = 0; i < s->nvrtx; ++i)
+    {
+      for (j = 0; j < 3; ++j)
+      {
         s->vrtx[nclosestS - 1 - i][j] = tmpscoo1[sID[i]][j];
       }
       s->lambdas[i] = tmplamda[i];
       s->wids[nclosestS - 1 - i] = sID[i];
     }
   }
-  else if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 1) {
+  else if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 1)
+  {
     /* There are two   facets facing the origin, need to find the closest.   */
-    struct simplex  sTmp;
+    struct simplex sTmp;
     sTmp.nvrtx = 3;
 
-    if (FacetsTest[1] == 0) {
+    if (FacetsTest[1] == 0)
+    {
       /* ... Test facet ACD  */
-      for (i = 0; i < 3; ++i) {
+      for (i = 0; i < 3; ++i)
+      {
         sTmp.vrtx[0][i] = s->vrtx[0][i];
         sTmp.vrtx[1][i] = s->vrtx[1][i];
         sTmp.vrtx[2][i] = s->vrtx[3][i];
@@ -560,9 +645,11 @@ inline static void S3D(struct simplex * s,  double *vv) {
       /* ... and call S2D  */
       S2D(&sTmp, v);
       /* ... compute aux squared distance */
-      for (j = 0; j < 3; ++j) {
+      for (j = 0; j < 3; ++j)
+      {
         vtmp[j] = 0;
-        for (i = 0; i < sTmp.nvrtx; ++i) {
+        for (i = 0; i < sTmp.nvrtx; ++i)
+        {
           vtmp[j] += sTmp.lambdas[i] * (sTmp.vrtx[i][j]);
         }
       }
@@ -570,11 +657,14 @@ inline static void S3D(struct simplex * s,  double *vv) {
       Flag_sAuxused = 1;
       firstaux = 0;
     }
-    if (FacetsTest[2] == 0) {
+    if (FacetsTest[2] == 0)
+    {
       /* ... Test facet ABD  */
-      if (Flag_sAuxused == 0) {
+      if (Flag_sAuxused == 0)
+      {
 
-        for (i = 0; i < 3; ++i) {
+        for (i = 0; i < 3; ++i)
+        {
           sTmp.vrtx[0][i] = s->vrtx[0][i];
           sTmp.vrtx[1][i] = s->vrtx[2][i];
           sTmp.vrtx[2][i] = s->vrtx[3][i];
@@ -582,18 +672,22 @@ inline static void S3D(struct simplex * s,  double *vv) {
         /* ... and call S2D  */
         S2D(&sTmp, v);
         /* ... compute aux squared distance */
-        for (j = 0; j < 3; ++j) {
+        for (j = 0; j < 3; ++j)
+        {
           vtmp[j] = 0;
-          for (i = 0; i < sTmp.nvrtx; ++i) {
+          for (i = 0; i < sTmp.nvrtx; ++i)
+          {
             vtmp[j] += sTmp.lambdas[i] * (sTmp.vrtx[i][j]);
           }
         }
         sqdist_tmp = dotProduct(vtmp, vtmp);
         firstaux = 1;
       }
-      else {
+      else
+      {
         s->nvrtx = 3;
-        for (i = 0; i < 3; ++i) {
+        for (i = 0; i < 3; ++i)
+        {
           s->vrtx[0][i] = s->vrtx[0][i];
           s->vrtx[1][i] = s->vrtx[2][i];
           s->vrtx[2][i] = s->vrtx[3][i];
@@ -604,10 +698,12 @@ inline static void S3D(struct simplex * s,  double *vv) {
       }
     }
 
-    if (FacetsTest[3] == 0) {
+    if (FacetsTest[3] == 0)
+    {
       /* ... Test facet ABC  */
       s->nvrtx = 3;
-      for (i = 0; i < 3; ++i) {
+      for (i = 0; i < 3; ++i)
+      {
         s->vrtx[0][i] = s->vrtx[1][i];
         s->vrtx[1][i] = s->vrtx[2][i];
         s->vrtx[2][i] = s->vrtx[3][i];
@@ -616,37 +712,49 @@ inline static void S3D(struct simplex * s,  double *vv) {
       S2D(s, v);
       secondaux = 2;
     }
-    /* Compare outcomes */ 
-    for (j = 0; j < 3; ++j) {
+    /* Compare outcomes */
+    for (j = 0; j < 3; ++j)
+    {
       v[j] = 0;
-      for (i = 0; i < s->nvrtx; ++i) {
+      for (i = 0; i < s->nvrtx; ++i)
+      {
         v[j] += s->lambdas[i] * (s->vrtx[i][j]);
       }
     }
-    if (dotProduct(v, v) < sqdist_tmp) {
+    if (dotProduct(v, v) < sqdist_tmp)
+    {
       /* Keep simplex. Need to update sID only*/
-      for (i = 0; i < s->nvrtx; ++i) {
+      for (i = 0; i < s->nvrtx; ++i)
+      {
         /* Assume that vertex a is always included in sID. */
-        s->wids[s->nvrtx - 1 - i] = TrianglesToTest[secondaux + (s->wids[i] * 3)];
+        s->wids[s->nvrtx - 1 - i]
+            = TrianglesToTest[secondaux + (s->wids[i] * 3)];
       }
     }
-    else {
+    else
+    {
       s->nvrtx = sTmp.nvrtx;
-      for (i = 0; i < s->nvrtx; ++i) {
-        for (j = 0; j < 3; ++j) {
+      for (i = 0; i < s->nvrtx; ++i)
+      {
+        for (j = 0; j < 3; ++j)
+        {
           s->vrtx[i][j] = sTmp.vrtx[i][j];
         }
         s->lambdas[i] = sTmp.lambdas[i];
-        s->wids[sTmp.nvrtx - 1 - i] = TrianglesToTest[firstaux + (sTmp.wids[i] * 3)];
+        s->wids[sTmp.nvrtx - 1 - i]
+            = TrianglesToTest[firstaux + (sTmp.wids[i] * 3)];
       }
     }
   }
-  else if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 2) {
+  else if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 2)
+  {
     /* Only one facet is facing the origin */
-    if (FacetsTest[1] == 0) {
-      /* The origin projection P faces the facet ACD */ 
+    if (FacetsTest[1] == 0)
+    {
+      /* The origin projection P faces the facet ACD */
       s->nvrtx = 3;
-      for (i = 0; i < 3; ++i) {
+      for (i = 0; i < 3; ++i)
+      {
         s->vrtx[0][i] = s->vrtx[0][i];
         s->vrtx[1][i] = s->vrtx[1][i];
         s->vrtx[2][i] = s->vrtx[3][i];
@@ -654,29 +762,35 @@ inline static void S3D(struct simplex * s,  double *vv) {
       S2D(s, v);
 
       /* Keep simplex. Need to update sID only*/
-      for (i = 0; i < s->nvrtx; ++i) {
+      for (i = 0; i < s->nvrtx; ++i)
+      {
         s->wids[i] = s->wids[i];
       }
     }
-    else if (FacetsTest[2] == 0) {
-      /* The origin projection P faces the facet ABD */ 
+    else if (FacetsTest[2] == 0)
+    {
+      /* The origin projection P faces the facet ABD */
       s->nvrtx = 3;
-      for (i = 0; i < 3; ++i) {
+      for (i = 0; i < 3; ++i)
+      {
         s->vrtx[0][i] = s->vrtx[0][i];
         s->vrtx[1][i] = s->vrtx[2][i];
         s->vrtx[2][i] = s->vrtx[3][i];
       }
       S2D(s, v);
       /* Keep simplex. Need to update sID only*/
-      for (i = 2; i < s->nvrtx; ++i) {
+      for (i = 2; i < s->nvrtx; ++i)
+      {
         /* Assume that vertex a is always included in sID. */
         s->wids[i] = s->wids[i] + 1;
       }
     }
-    else if (FacetsTest[3] == 0) {
+    else if (FacetsTest[3] == 0)
+    {
       /* The origin projection P faces the facet ABC */
       s->nvrtx = 3;
-      for (i = 0; i < 3; ++i) {
+      for (i = 0; i < 3; ++i)
+      {
         s->vrtx[0][i] = s->vrtx[1][i];
         s->vrtx[1][i] = s->vrtx[2][i];
         s->vrtx[2][i] = s->vrtx[3][i];
@@ -684,10 +798,12 @@ inline static void S3D(struct simplex * s,  double *vv) {
       S2D(s, v);
     }
   }
-  else {
+  else
+  {
     /* The origin projection P faces the facet BCD */
     s->nvrtx = 3;
-    for (i = 0; i < 3; ++i) {
+    for (i = 0; i < 3; ++i)
+    {
       s->vrtx[0][i] = s->vrtx[0][i];
       s->vrtx[1][i] = s->vrtx[1][i];
       s->vrtx[2][i] = s->vrtx[2][i];
@@ -695,73 +811,82 @@ inline static void S3D(struct simplex * s,  double *vv) {
     /* ... and call S2D   */
     S2D(s, v);
     /* Keep simplex. Need to update sID only*/
-    for (i = 0; i < s->nvrtx; ++i) {
+    for (i = 0; i < s->nvrtx; ++i)
+    {
       /* Assume that vertex a is always included in sID. */
       s->wids[i] = s->wids[i] + 1;
     }
   }
 
-
-  for ( j = 0; j < 3; ++j) {
+  for (j = 0; j < 3; ++j)
+  {
     vv[j] = 0;
-    for (i = 0; i < s->nvrtx; ++i) {
+    for (i = 0; i < s->nvrtx; ++i)
+    {
       vv[j] += (s->lambdas[i] * s->vrtx[i][j]);
     }
   }
 }
 
-
-inline static void support( struct bd *body, double *v ) {
-  int    better = -1;
-  int    i;
+inline static void support(struct bd* body, double* v)
+{
+  int better = -1;
+  int i;
   double s;
   double maxs;
-  double *vrt;
- 
+  double* vrt;
+
   maxs = dotProduct(body->s, v);
 
-  for (i = 0; i < body->numpoints; ++i) {
+  for (i = 0; i < body->numpoints; ++i)
+  {
     vrt = body->coord[i];
-    s = dotProduct (vrt, v);
-    if ( s > maxs ){
+    s = dotProduct(vrt, v);
+    if (s > maxs)
+    {
       maxs = s;
       better = i;
     }
   }
 
-  if (better != -1 ){
-	  body->s[0] = body->coord[better][0];
-	  body->s[1] = body->coord[better][1];
+  if (better != -1)
+  {
+    body->s[0] = body->coord[better][0];
+    body->s[1] = body->coord[better][1];
     body->s[2] = body->coord[better][2];
   }
 }
 
-inline static void subalgorithm( struct simplex *s, double *v ) {
+inline static void subalgorithm(struct simplex* s, double* v)
+{
 
-  switch ( s->nvrtx ){
-    case 4: 
-      S3D( s, v );
-      break;
-    case 3: 
-      S2D( s, v );
-      break;
-    case 2: 
-      S1D( s, v );
-      break;
+  switch (s->nvrtx)
+  {
+  case 4:
+    S3D(s, v);
+    break;
+  case 3:
+    S2D(s, v);
+    break;
+  case 2:
+    S1D(s, v);
+    break;
   }
 }
 
-double gjk( struct bd bd1, struct bd bd2, struct simplex *s) {
+double gjk(struct bd bd1, struct bd bd2, struct simplex* s)
+{
 
-  int    i;                   
-  int    k = 0;                /**< Iteration counter            */
-  int    mk = 50;              /**< Maximum number of iterations of the GJK algorithm */
-  int    exeedtol_rel = 0;     /**< Flag for 1st exit condition  */
-  double v[3];                 /**< Search direction             */
-  double vminus[3];            /**< Search direction * -1        */
-  double w[3];                 /**< Vertex on CSO boundary given by the difference of support functions on both bodies */
-  double eps_rel = 1e-5;       /**< Tolerance on relative distance */
-  double eps_tot = 1e-15;      /**< Tolerance on absolute distance */
+  int i;
+  int k = 0;   /**< Iteration counter            */
+  int mk = 50; /**< Maximum number of iterations of the GJK algorithm */
+  int exeedtol_rel = 0; /**< Flag for 1st exit condition  */
+  double v[3];          /**< Search direction             */
+  double vminus[3];     /**< Search direction * -1        */
+  double w[3]; /**< Vertex on CSO boundary given by the difference of support
+                  functions on both bodies */
+  double eps_rel = 1e-5;  /**< Tolerance on relative distance */
+  double eps_tot = 1e-15; /**< Tolerance on absolute distance */
   double norm2Wmax = 0;
   double tesnorm = 0;
 
@@ -769,22 +894,23 @@ double gjk( struct bd bd1, struct bd bd2, struct simplex *s) {
   exactinit();
 #endif
 
-  double eps_rel2 = eps_rel * eps_rel  ;
+  double eps_rel2 = eps_rel * eps_rel;
 
   /* Initialise  */
   s->nvrtx = 1;
-  for ( i = 0; i < 3; i++)
+  for (i = 0; i < 3; i++)
   {
     v[i] = bd1.coord[0][i] - bd2.coord[0][i];
     bd1.s[i] = bd1.coord[0][i];
     bd2.s[i] = bd2.coord[0][i];
     s->vrtx[0][i] = v[i];
-	s->p[0][i] = bd1.s[i];
-	s->q[0][i] = bd2.s[i];
+    s->p[0][i] = bd1.s[i];
+    s->q[0][i] = bd2.s[i];
   }
 
   /* Begin GJK iteration */
-  do {
+  do
+  {
 
     k++;
 
@@ -794,22 +920,23 @@ double gjk( struct bd bd1, struct bd bd2, struct simplex *s) {
     vminus[2] = -v[2];
 
     /* Support function */
-    support( &bd1 , vminus );
-    support( &bd2 , v );
+    support(&bd1, vminus);
+    support(&bd2, v);
     w[0] = bd1.s[0] - bd2.s[0];
     w[1] = bd1.s[1] - bd2.s[1];
     w[2] = bd1.s[2] - bd2.s[2];
 
     /* 1st exit condition */
-    exeedtol_rel = (norm2(v) - dotProduct (v,w) ) <= eps_rel2 * norm2(v);
-    if ( exeedtol_rel ){
+    exeedtol_rel = (norm2(v) - dotProduct(v, w)) <= eps_rel2 * norm2(v);
+    if (exeedtol_rel)
+    {
       break;
     }
 
     /* 2nd exit condition */
     if (norm2(v) < eps_rel2)
       break;
-    
+
     /* Add new vertex to simplex */
     i = s->nvrtx;
     s->vrtx[i][0] = w[0];
@@ -818,19 +945,20 @@ double gjk( struct bd bd1, struct bd bd2, struct simplex *s) {
     s->nvrtx++;
 
     /* Invoke distance sub-algorithm */
-    subalgorithm ( s, v );
+    subalgorithm(s, v);
 
-	for (i = 0; i < 3; i++)
-	{
-		s->p[s->nvrtx - 1][i] = bd1.s[i];
-		s->q[s->nvrtx - 1][i] = bd2.s[i];
-	}
+    for (i = 0; i < 3; i++)
+    {
+      s->p[s->nvrtx - 1][i] = bd1.s[i];
+      s->q[s->nvrtx - 1][i] = bd2.s[i];
+    }
 
     /* 3rd exit condition */
     for (i = 0; i < s->nvrtx; i++)
     {
       tesnorm = norm2(s->vrtx[i]);
-      if (tesnorm > norm2Wmax) {
+      if (tesnorm > norm2Wmax)
+      {
         norm2Wmax = tesnorm;
       }
     }
@@ -838,60 +966,69 @@ double gjk( struct bd bd1, struct bd bd2, struct simplex *s) {
       break;
 
     /* 4th and 5th exit conditions */
-  } while((s->nvrtx != 4) && (k != mk));
-  
-  /* Compute and return distance */ 
+  } while ((s->nvrtx != 4) && (k != mk));
+
+  /* Compute and return distance */
   return sqrt(norm2(v));
 }
 
-#ifdef MATLABDOESMEXSTUFF 
+#ifdef MATLABDOESMEXSTUFF
 /**
  * @brief Mex function for Matlab.
  */
-void mexFunction( int nlhs, mxArray *plhs[],
-                  int nrhs, const mxArray *prhs[])
+void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 {
-      
-  double *inCoordsA; 
-  double *inCoordsB;  
-  size_t  nCoordsA;   
-  size_t  nCoordsB;  
-  int     i;    
-  double *distance;   
-  int     c = 3;
-  int     count = 0; 
-  double**arr1;
-  double**arr2;
+
+  double* inCoordsA;
+  double* inCoordsB;
+  size_t nCoordsA;
+  size_t nCoordsB;
+  int i;
+  double* distance;
+  int c = 3;
+  int count = 0;
+  double** arr1;
+  double** arr2;
 
   /**************** PARSE INPUTS AND OUTPUTS **********************/
   /*----------------------------------------------------------------*/
   /* Examine input (right-hand-side) arguments. */
-  if(nrhs!=2) {
-    mexErrMsgIdAndTxt("MyToolbox:gjk:nrhs","Two inputs required.");
+  if (nrhs != 2)
+  {
+    mexErrMsgIdAndTxt("MyToolbox:gjk:nrhs", "Two inputs required.");
   }
   /* Examine output (left-hand-side) arguments. */
-  if(nlhs!=1) {
-    mexErrMsgIdAndTxt("MyToolbox:gjk:nlhs","One output required.");
+  if (nlhs != 1)
+  {
+    mexErrMsgIdAndTxt("MyToolbox:gjk:nlhs", "One output required.");
   }
 
   /* make sure the two input arguments are any numerical type */
   /* .. first input */
-  if( !mxIsNumeric(prhs[0])) {
-    mexErrMsgIdAndTxt("MyToolbox:gjk:notNumeric","Input matrix must be type numeric.");
+  if (!mxIsNumeric(prhs[0]))
+  {
+    mexErrMsgIdAndTxt("MyToolbox:gjk:notNumeric",
+                      "Input matrix must be type numeric.");
   }
   /* .. second input */
-  if( !mxIsNumeric(prhs[1])) {
-    mexErrMsgIdAndTxt("MyToolbox:gjk:notNumeric","Input matrix must be type numeric.");
+  if (!mxIsNumeric(prhs[1]))
+  {
+    mexErrMsgIdAndTxt("MyToolbox:gjk:notNumeric",
+                      "Input matrix must be type numeric.");
   }
 
   /* make sure the two input arguments have 3 columns */
   /* .. first input */
-  if(mxGetM(prhs[0])!=3) {
-    mexErrMsgIdAndTxt("MyToolbox:gjk:notColumnVector","First input must have 3 columns.");
+  if (mxGetM(prhs[0]) != 3)
+  {
+    mexErrMsgIdAndTxt("MyToolbox:gjk:notColumnVector",
+                      "First input must have 3 columns.");
   }
   /* .. second input */
-  if(mxGetM(prhs[1])!=3) {
-    mexErrMsgIdAndTxt("MyToolbox:gjk:notColumnVector","Second input must have 3 columns.");
+  if (mxGetM(prhs[1]) != 3)
+  {
+    mexErrMsgIdAndTxt("MyToolbox:gjk:notColumnVector",
+                      "Second input must have 3 columns.");
   }
 
   /*----------------------------------------------------------------*/
@@ -906,86 +1043,85 @@ void mexFunction( int nlhs, mxArray *plhs[],
   nCoordsB = mxGetN(prhs[1]);
 
   /* Create output */
-  plhs[0]=mxCreateDoubleMatrix(1,1,mxREAL);
+  plhs[0] = mxCreateDoubleMatrix(1, 1, mxREAL);
 
   /* get a pointer to the real data in the output matrix */
   distance = mxGetPr(plhs[0]);
 
-   /* Copy data from Matlab's vectors into two new arrays */ 
-  arr1 = (double **)mxMalloc( sizeof(double *) * (int)nCoordsA ); 
-  arr2 = (double **)mxMalloc( sizeof(double *) * (int)nCoordsB );
+  /* Copy data from Matlab's vectors into two new arrays */
+  arr1 = (double**)mxMalloc(sizeof(double*) * (int)nCoordsA);
+  arr2 = (double**)mxMalloc(sizeof(double*) * (int)nCoordsB);
 
   for (i = 0; i < nCoordsA; i++)
-    arr1[i] = &inCoordsA[i  * 3];
-  
+    arr1[i] = &inCoordsA[i * 3];
+
   for (i = 0; i < nCoordsB; i++)
-    arr2[i] = &inCoordsB[i  * 3]; 
+    arr2[i] = &inCoordsB[i * 3];
 
   /*----------------------------------------------------------------*/
   /* POPULATE BODIES' STRUCTURES  */
 
-  struct bd       bd1; /* Structure of body A */
-  struct bd       bd2; /* Structure of body B */
-  
+  struct bd bd1; /* Structure of body A */
+  struct bd bd2; /* Structure of body B */
+
   /* Assign number of vertices to each body */
-  bd1.numpoints = (int) nCoordsA;
-  bd2.numpoints = (int) nCoordsB;
-   
+  bd1.numpoints = (int)nCoordsA;
+  bd2.numpoints = (int)nCoordsB;
+
   bd1.coord = arr1;
   bd2.coord = arr2;
 
   /*----------------------------------------------------------------*/
   /*CALL COMPUTATIONAL ROUTINE  */
-  
+
   struct simplex s;
   s.nvrtx = 0;
 
   /* Compute squared distance using GJK algorithm */
-  distance[0] = gjk (bd1, bd2, &s);
+  distance[0] = gjk(bd1, bd2, &s);
 
   mxFree(arr1);
   mxFree(arr2);
-
 }
 #endif
 
 /**
  * @brief Invoke this function from C# applications
  */
-double csFunction( int nCoordsA, double *inCoordsA, int nCoordsB, double *inCoordsB )
-{ 
+double csFunction(int nCoordsA, double* inCoordsA, int nCoordsB,
+                  double* inCoordsB)
+{
   double distance = 0;
   int i, j;
 
   /*----------------------------------------------------------------*/
   /* POPULATE BODIES' STRUCTURES  */
 
-  struct bd       bd1; /* Structure of body A */
-  struct bd       bd2; /* Structure of body B */
+  struct bd bd1; /* Structure of body A */
+  struct bd bd2; /* Structure of body B */
 
   /* Assign number of vertices to each body */
-  bd1.numpoints = (int) nCoordsA;
-  bd2.numpoints = (int) nCoordsB;
+  bd1.numpoints = (int)nCoordsA;
+  bd2.numpoints = (int)nCoordsB;
 
-  double **pinCoordsA = (double **)malloc(bd1.numpoints * sizeof(double *));
-  for (i=0; i< bd1.numpoints ; i++)
-     pinCoordsA[i] = (double *)malloc(3 * sizeof(double));
+  double** pinCoordsA = (double**)malloc(bd1.numpoints * sizeof(double*));
+  for (i = 0; i < bd1.numpoints; i++)
+    pinCoordsA[i] = (double*)malloc(3 * sizeof(double));
 
-  for (i = 0; i <  3; i++)
+  for (i = 0; i < 3; i++)
     for (j = 0; j < bd1.numpoints; j++)
-      pinCoordsA[j][i] = inCoordsA[ i*bd1.numpoints + j] ;
+      pinCoordsA[j][i] = inCoordsA[i * bd1.numpoints + j];
 
-  double **pinCoordsB = (double **)malloc(bd2.numpoints * sizeof(double *));
-  for (i=0; i< bd2.numpoints ; i++)
-    pinCoordsB[i] = (double *)malloc(3 * sizeof(double));
+  double** pinCoordsB = (double**)malloc(bd2.numpoints * sizeof(double*));
+  for (i = 0; i < bd2.numpoints; i++)
+    pinCoordsB[i] = (double*)malloc(3 * sizeof(double));
 
-  for (i = 0; i <  3; i++)
+  for (i = 0; i < 3; i++)
     for (j = 0; j < bd2.numpoints; j++)
-      pinCoordsB[j][i] = inCoordsB[ i*bd2.numpoints + j] ;
+      pinCoordsB[j][i] = inCoordsB[i * bd2.numpoints + j];
 
   bd1.coord = pinCoordsA;
   bd2.coord = pinCoordsB;
-
 
   /*----------------------------------------------------------------*/
   /*CALL COMPUTATIONAL ROUTINE  */
@@ -995,15 +1131,46 @@ double csFunction( int nCoordsA, double *inCoordsA, int nCoordsB, double *inCoor
   s.nvrtx = 0;
 
   /* Compute squared distance using GJK algorithm */
-  distance = gjk (bd1, bd2, &s);
+  distance = gjk(bd1, bd2, &s);
 
-  for (i=0; i< bd1.numpoints ; i++)
+  for (i = 0; i < bd1.numpoints; i++)
     free(pinCoordsA[i]);
-  free( pinCoordsA );
+  free(pinCoordsA);
 
-  for (i=0; i< bd2.numpoints ; i++)
+  for (i = 0; i < bd2.numpoints; i++)
     free(pinCoordsB[i]);
-  free( pinCoordsB );
+  free(pinCoordsB);
 
   return distance;
+}
+
+#include <pybind11/eigen.h>
+#include <pybind11/pybind11.h>
+namespace py = pybind11;
+
+PYBIND11_MODULE(opengjkc, m)
+{
+  m.def("gjk",
+        [](Eigen::Array<double, Eigen::Dynamic, 3, Eigen::RowMajor>& arr1,
+           Eigen::Array<double, Eigen::Dynamic, 3, Eigen::RowMajor>& arr2)
+            -> double {
+          struct simplex s;
+          struct bd bd1;
+          struct bd bd2;
+          bd1.numpoints = arr1.rows();
+          std::vector<double*> arr1_rows(arr1.rows());
+          for (int i = 0; i < arr1.rows(); ++i)
+            arr1_rows[i] = arr1.row(i).data();
+          bd1.coord = arr1_rows.data();
+
+          bd2.numpoints = arr2.rows();
+          std::vector<double*> arr2_rows(arr2.rows());
+          for (int i = 0; i < arr2.rows(); ++i)
+            arr2_rows[i] = arr2.row(i).data();
+          bd2.coord = arr2_rows.data();
+
+          double a = gjk(bd1, bd2, &s);
+
+          return a;
+        });
 }
