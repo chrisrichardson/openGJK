@@ -40,14 +40,13 @@
 #include <Eigen/Geometry>
 #include <iostream>
 
-#define SAMESIGN(a, b) ((a > 0) == (b > 0))
-
 /**
  * @brief Structure for a simplex.
  */
 class Simplex
 {
 public:
+  // Return a vector based on current coordinates and lambdas
   Eigen::Vector3d vec() const
   {
     Eigen::Vector3d vv;
@@ -57,9 +56,13 @@ public:
     return vv;
   }
 
+  // Number of active vertices (1=point, 2=line, 3=triangle, 4=tetrahedron)
   int nvrtx;
+  // Vertex coordinates
   Eigen::Matrix<double, 4, 3, Eigen::RowMajor> vrtx;
+  // Vertex IDs
   Eigen::Vector4i wids;
+  // Barycentric coordinates
   Eigen::Vector4d lambdas;
 };
 
@@ -71,10 +74,8 @@ public:
  *
  */
 
-/**
- * @brief Finds point of minimum norm of 1-simplex. Robust, but slower,
- * version of algorithm presented in paper.
- */
+/// @brief Finds point of minimum norm of 1-simplex. Robust, but slower,
+/// version of algorithm presented in paper.
 void S1D(Simplex& s)
 {
   Eigen::Vector3d b = s.vrtx.row(0);
@@ -110,10 +111,8 @@ void S1D(Simplex& s)
   }
 }
 
-/**
- * @brief Finds point of minimum norm of 2-simplex. Robust, but slower,
- * version of algorithm presented in paper.
- */
+/// @brief Finds point of minimum norm of 2-simplex. Robust, but slower,
+/// version of algorithm presented in paper.
 void S2D(Simplex& s)
 {
   Eigen::Vector3d v, vtmp;
@@ -139,7 +138,7 @@ void S2D(Simplex& s)
   double pp[2] = {dotNA * n[indexJ[0]], dotNA * n[indexJ[1]]};
 
   /* Compute signed determinants */
-  double ss[3][3 - 1];
+  double ss[3][2];
   ss[0][0] = a[indexJ[0]];
   ss[0][1] = a[indexJ[1]];
   ss[1][0] = b[indexJ[0]];
@@ -161,7 +160,7 @@ void S2D(Simplex& s)
   /* Test if sign of ABC is equal to the signes of the auxiliary simplices */
   int FacetsTest[3];
   for (int i = 0; i < 3; ++i)
-    FacetsTest[i] = SAMESIGN(nu_max, B[i]);
+    FacetsTest[i] = (std::signbit(nu_max) == std::signbit(B[i]));
 
   // The nan check was not included originally and will be removed in v2.0
   if (FacetsTest[1] + FacetsTest[2] == 0 or std::isnan(n[0]))
@@ -234,11 +233,8 @@ void S2D(Simplex& s)
   }
 }
 //-------------------------------------------------------
-
-/**
- * @brief Finds point of minimum norm of 3-simplex. Robust, but slower, version
- * of algorithm presented in paper.
- */
+/// @brief Finds point of minimum norm of 3-simplex. Robust, but slower, version
+/// of algorithm presented in paper.
 void S3D(Simplex& s)
 {
   int FacetsTest[4] = {1, 1, 1, 1};
@@ -285,10 +281,10 @@ void S3D(Simplex& s)
   else
   {
     for (int i = 0; i < 4; ++i)
-      FacetsTest[i] = SAMESIGN(detM, B[i]);
+      FacetsTest[i] = (std::signbit(detM) == std::signbit(B[i]));
   }
 
-  /* Compare signed volumes and compute barycentric coordinates */
+  // Compare signed volumes and compute barycentric coordinates
   if (FacetsTest[0] + FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 4)
   {
     /* All signs are equal, therefore the origin is inside the simplex */
@@ -305,7 +301,7 @@ void S3D(Simplex& s)
   }
   else if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 0)
   {
-    /* There are three facets facing the origin  */
+    // There are three facets facing the origin
     Simplex sTmp;
     Eigen::Vector4d tmplamda;
     sqdist_tmp = std::numeric_limits<double>::max();
@@ -314,7 +310,7 @@ void S3D(Simplex& s)
     for (int i = 0; i < 3; ++i)
     {
       sTmp.nvrtx = 3;
-      /* Assign coordinates to simplex */
+      // Assign coordinates to simplex
       for (int k = 0; k < sTmp.nvrtx; ++k)
       {
         const int vtxid = TrianglesToTest[i + (k * 3)];
