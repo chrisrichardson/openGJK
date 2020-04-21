@@ -68,36 +68,25 @@ public:
  * @brief Finds point of minimum norm of 1-simplex. Robust, but slower,
  * version of algorithm presented in paper.
  */
-void S1D(Simplex& s, Eigen::Vector3d& vv)
+Eigen::Vector3d S1D(Simplex& s)
 {
   Eigen::Vector3d b = s.vrtx.row(0);
   Eigen::Vector3d a = s.vrtx.row(1);
   Eigen::Vector3d t = b - a;
-  Eigen::Vector3d nu_fabs = t.cwiseAbs();
-  int indexI;
-  nu_fabs.maxCoeff(&indexI);
 
   /* Project origin onto the 1D simplex - line */
-  double pt = b.dot(t) / t.squaredNorm() * (a[indexI] - b[indexI]) + b[indexI];
+  double pt = b.dot(t) / t.squaredNorm();
 
-  /* Compute signed determinants */
-  double det_ap = a[indexI] - pt;
-  double det_pb = pt - b[indexI];
-
-  /* Compare signs of AB and auxiliary simplices */
-  int FacetsTest[2]
-      = {SAMESIGN(t[indexI], -1 * det_ap), SAMESIGN(t[indexI], -1 * det_pb)};
-
-  if (FacetsTest[0] + FacetsTest[1] == 2)
+  if (pt >= 0.0 and pt <= 1.0)
   {
     /* The origin is between A and B */
-    s.lambdas[0] = det_ap * -1.0 / t[indexI];
-    s.lambdas[1] = 1 - s.lambdas[0];
+    s.lambdas[0] = 1.0 - pt;
+    s.lambdas[1] = pt;
     s.wids[0] = 0;
     s.wids[1] = 1;
     s.nvrtx = 2;
   }
-  else if (FacetsTest[0] == 0)
+  else if (pt > 1.0)
   {
     /* The origin is beyond A */
     s.lambdas[0] = 1;
@@ -113,9 +102,11 @@ void S1D(Simplex& s, Eigen::Vector3d& vv)
     s.nvrtx = 1;
   }
 
+  Eigen::Vector3d vv;
   vv.setZero();
   for (int i = 0; i < s.nvrtx; ++i)
     vv += s.lambdas[i] * s.vrtx.row(i);
+  return vv;
 }
 
 /**
@@ -208,8 +199,8 @@ void S2D(Simplex& s, Eigen::Vector3d& vv)
     // s.vrtx.row(0) = s.vrtx.row(0);
     s.vrtx.row(1) = s.vrtx.row(2);
 
-    S1D(sTmp, vtmp);
-    S1D(s, v);
+    vtmp = S1D(sTmp);
+    v = S1D(s);
 
     if (v.squaredNorm() < vtmp.squaredNorm())
     {
@@ -249,14 +240,14 @@ void S2D(Simplex& s, Eigen::Vector3d& vv)
     s.nvrtx = 2;
     s.vrtx.row(0) = s.vrtx.row(1);
     s.vrtx.row(1) = s.vrtx.row(2);
-    S1D(s, v);
+    v = S1D(s);
   }
   else if (FacetsTest[1] == 0)
   {
     /* The origin projection P faces the segment AC */
     s.nvrtx = 2;
     s.vrtx.row(1) = s.vrtx.row(2);
-    S1D(s, v);
+    v = S1D(s);
     for (int i = 1; i < s.nvrtx; ++i)
       ++s.wids[i];
   }
@@ -264,7 +255,7 @@ void S2D(Simplex& s, Eigen::Vector3d& vv)
   {
     /* The origin projection P faces the segment BC */
     s.nvrtx = 2;
-    S1D(s, v);
+    v = S1D(s);
   }
 
   vv.setZero();
@@ -589,7 +580,7 @@ void subalgorithm(Simplex& s, Eigen::Vector3d& v)
     S2D(s, v);
     break;
   case 2:
-    S1D(s, v);
+    v = S1D(s);
     break;
   }
 }
