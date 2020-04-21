@@ -48,12 +48,19 @@
 class Simplex
 {
 public:
+  Eigen::Vector3d vec() const
+  {
+    Eigen::Vector3d vv;
+    vv.setZero();
+    for (int i = 0; i < nvrtx; ++i)
+      vv += lambdas[i] * vrtx.row(i);
+    return vv;
+  }
+
   int nvrtx;
   Eigen::Matrix<double, 4, 3, Eigen::RowMajor> vrtx;
   Eigen::Vector4i wids;
   Eigen::Vector4d lambdas;
-  // Eigen::Matrix<double, 4, 3, Eigen::RowMajor> p;
-  // Eigen::Matrix<double, 4, 3, Eigen::RowMajor>  q;
 };
 
 /**
@@ -68,7 +75,7 @@ public:
  * @brief Finds point of minimum norm of 1-simplex. Robust, but slower,
  * version of algorithm presented in paper.
  */
-Eigen::Vector3d S1D(Simplex& s)
+void S1D(Simplex& s)
 {
   Eigen::Vector3d b = s.vrtx.row(0);
   Eigen::Vector3d a = s.vrtx.row(1);
@@ -101,19 +108,13 @@ Eigen::Vector3d S1D(Simplex& s)
     s.wids[0] = 1;
     s.nvrtx = 1;
   }
-
-  Eigen::Vector3d vv;
-  vv.setZero();
-  for (int i = 0; i < s.nvrtx; ++i)
-    vv += s.lambdas[i] * s.vrtx.row(i);
-  return vv;
 }
 
 /**
  * @brief Finds point of minimum norm of 2-simplex. Robust, but slower,
  * version of algorithm presented in paper.
  */
-void S2D(Simplex& s, Eigen::Vector3d& vv)
+void S2D(Simplex& s)
 {
   Eigen::Vector3d v, vtmp;
   Eigen::Vector3d a, b, c, s21, s31;
@@ -130,16 +131,6 @@ void S2D(Simplex& s, Eigen::Vector3d& vv)
   nu_fabs.maxCoeff(&indexI);
   double nu_max = nu_test[indexI];
   int indexJ[2] = {(indexI + 1) % 3, (indexI + 2) % 3};
-
-  // int k = 1;
-  // int l = 2;
-  // Eigen::Vector3d n;
-  // for (int i = 0; i < 3; ++i)
-  // {
-  //   n[i] = s21[k] * s31[l] - s21[l] * s31[k];
-  //   k = l;
-  //   l = i;
-  // }
   Eigen::Vector3d n = s21.cross(s31);
   n.normalize();
 
@@ -148,7 +139,6 @@ void S2D(Simplex& s, Eigen::Vector3d& vv)
   double pp[2] = {dotNA * n[indexJ[0]], dotNA * n[indexJ[1]]};
 
   /* Compute signed determinants */
-#ifndef ADAPTIVEFP
   double ss[3][3 - 1];
   ss[0][0] = a[indexJ[0]];
   ss[0][1] = a[indexJ[1]];
@@ -167,19 +157,6 @@ void S2D(Simplex& s, Eigen::Vector3d& vv)
     k = l;
     l = i;
   }
-#else
-  double sa[2], sb[2], sc[2];
-  sa[0] = a[indexJ[0]];
-  sa[1] = a[indexJ[1]];
-  sb[0] = b[indexJ[0]];
-  sb[1] = b[indexJ[1]];
-  sc[0] = c[indexJ[0]];
-  sc[1] = c[indexJ[1]];
-
-  B[0] = orient2d(sa, pp, sc);
-  B[1] = orient2d(sa, pp, sc);
-  B[2] = orient2d(sa, sb, pp);
-#endif
 
   /* Test if sign of ABC is equal to the signes of the auxiliary simplices */
   int FacetsTest[3];
@@ -199,8 +176,10 @@ void S2D(Simplex& s, Eigen::Vector3d& vv)
     // s.vrtx.row(0) = s.vrtx.row(0);
     s.vrtx.row(1) = s.vrtx.row(2);
 
-    vtmp = S1D(sTmp);
-    v = S1D(s);
+    S1D(sTmp);
+    S1D(s);
+    vtmp = sTmp.vec();
+    v = s.vec();
 
     if (v.squaredNorm() < vtmp.squaredNorm())
     {
@@ -213,13 +192,9 @@ void S2D(Simplex& s, Eigen::Vector3d& vv)
       s.nvrtx = sTmp.nvrtx;
       s.vrtx = sTmp.vrtx;
       s.lambdas = sTmp.lambdas;
-
-      for (int i = 0; i < s.nvrtx; ++i)
-      {
-        /* No need to convert sID here since sTmp deal with the vertices A
-         * and B. ;*/
-        s.wids[i] = sTmp.wids[i];
-      }
+      // No need to convert sID here
+      // since sTmp deals with the vertices A and B.
+      s.wids = sTmp.wids;
     }
   }
   else if ((FacetsTest[0] + FacetsTest[1] + FacetsTest[2]) == 3)
@@ -240,14 +215,14 @@ void S2D(Simplex& s, Eigen::Vector3d& vv)
     s.nvrtx = 2;
     s.vrtx.row(0) = s.vrtx.row(1);
     s.vrtx.row(1) = s.vrtx.row(2);
-    v = S1D(s);
+    S1D(s);
   }
   else if (FacetsTest[1] == 0)
   {
     /* The origin projection P faces the segment AC */
     s.nvrtx = 2;
     s.vrtx.row(1) = s.vrtx.row(2);
-    v = S1D(s);
+    S1D(s);
     for (int i = 1; i < s.nvrtx; ++i)
       ++s.wids[i];
   }
@@ -255,12 +230,8 @@ void S2D(Simplex& s, Eigen::Vector3d& vv)
   {
     /* The origin projection P faces the segment BC */
     s.nvrtx = 2;
-    v = S1D(s);
+    S1D(s);
   }
-
-  vv.setZero();
-  for (int i = 0; i < s.nvrtx; ++i)
-    vv += s.lambdas[i] * s.vrtx.row(i);
 }
 //-------------------------------------------------------
 
@@ -268,78 +239,42 @@ void S2D(Simplex& s, Eigen::Vector3d& vv)
  * @brief Finds point of minimum norm of 3-simplex. Robust, but slower, version
  * of algorithm presented in paper.
  */
-inline static void S3D(Simplex& s, Eigen::Vector3d& vv)
+void S3D(Simplex& s)
 {
   int FacetsTest[4] = {1, 1, 1, 1};
-  int TrianglesToTest[9] = {3, 3, 3, 1, 2, 2, 0, 0, 1};
-  int nclosestS = 0;
+  static const int TrianglesToTest[9] = {3, 3, 3, 1, 2, 2, 0, 0, 1};
   int firstaux = 0;
   int secondaux = 0;
   int Flag_sAuxused = 0;
-  Eigen::Vector3d v, vtmp;
-  Eigen::Vector4d B;
-  double tmplamda[4] = {0, 0, 0, 0};
   double sqdist_tmp = 0;
-  double detM;
-  double inv_detM;
-#ifdef ADAPTIVEFP
-  double o[3] = {0};
-#endif
 
-  Eigen::Vector3d a = s.vrtx.row(3);
-  Eigen::Vector3d b = s.vrtx.row(2);
-  Eigen::Vector3d c = s.vrtx.row(1);
-  Eigen::Vector3d d = s.vrtx.row(0);
+  Eigen::Matrix3d mtmp = s.vrtx.bottomRows(3);
+  Eigen::Vector4d B;
+  B[3] = -mtmp.determinant();
+  mtmp.row(0) = s.vrtx.row(0);
+  B[2] = mtmp.determinant();
+  mtmp.row(1) = s.vrtx.row(1);
+  B[1] = -mtmp.determinant();
+  mtmp.row(2) = s.vrtx.row(2);
+  B[0] = mtmp.determinant();
+  double detM = B.sum();
 
-  // Eigen::Matrix3d mtmp;
-  // mtmp.row(0) = s.vrtx.row(0);
-  // mtmp.row(1) = s.vrtx.row(2);
-  // mtmp.row(2) = s.vrtx.row(3);
-
-  // B[3] = -s.vrtx.bottomRows(3).determinant();
-  // B[2] = mtmp.determinant();
-  // mtmp.row(1) = s.vrtx.row(1);
-  // B[1] = -mtmp.determinant();
-  // B[0] = s.vrtx.topRows(3).determinant();
-
-#ifndef ADAPTIVEFP
-  B[0] = -1
-         * (b[0] * c[1] * d[2] + b[1] * c[2] * d[0] + b[2] * c[0] * d[1]
-            - b[2] * c[1] * d[0] - b[1] * c[0] * d[2] - b[0] * c[2] * d[1]);
-  B[1] = +1
-         * (a[0] * c[1] * d[2] + a[1] * c[2] * d[0] + a[2] * c[0] * d[1]
-            - a[2] * c[1] * d[0] - a[1] * c[0] * d[2] - a[0] * c[2] * d[1]);
-  B[2] = -1
-         * (a[0] * b[1] * d[2] + a[1] * b[2] * d[0] + a[2] * b[0] * d[1]
-            - a[2] * b[1] * d[0] - a[1] * b[0] * d[2] - a[0] * b[2] * d[1]);
-  B[3] = +1
-         * (a[0] * b[1] * c[2] + a[1] * b[2] * c[0] + a[2] * b[0] * c[1]
-            - a[2] * b[1] * c[0] - a[1] * b[0] * c[2] - a[0] * b[2] * c[1]);
-
-  detM = B.sum();
-#else
-  B[0] = orient3d(o, b, c, d);
-  B[1] = orient3d(a, o, c, d);
-  B[2] = orient3d(a, b, o, d);
-  B[3] = orient3d(a, b, c, o);
-  detM = orient3d(a, b, c, d);
-#endif
-
-  /* Test if sign of ABCD is equal to the signes of the auxiliary simplices */
+  /* Test if sign of ABCD is equal to the signs of the auxiliary simplices */
   double eps = 1e-13;
-  if (fabs(detM) < eps)
+  if (std::abs(detM) < eps)
   {
-    if (fabs(B[2]) < eps && fabs(B[3]) < eps)
+    Eigen::Vector4d Babs = B.cwiseAbs();
+    if (Babs[2] < eps and Babs[3] < eps)
       FacetsTest[1] = 0; /* A = B. Test only ACD */
-    else if (fabs(B[1]) < eps && fabs(B[3]) < eps)
+    else if (Babs[1] < eps and Babs[3] < eps)
       FacetsTest[2] = 0; /* A = C. Test only ABD */
-    else if (fabs(B[1]) < eps && fabs(B[2]) < eps)
+    else if (Babs[1] < eps and Babs[2] < eps)
       FacetsTest[3] = 0; /* A = D. Test only ABC */
-    else if (fabs(B[0]) < eps && fabs(B[3]) < eps)
+    else if (Babs[0] < eps and Babs[3] < eps)
       FacetsTest[1] = 0; /* B = C. Test only ACD */
-    else if (fabs(B[0]) < eps && fabs(B[2]) < eps)
+    else if (Babs[0] < eps and Babs[2] < eps)
       FacetsTest[1] = 0; /* B = D. Test only ABD */
-    else if (fabs(B[0]) < eps && fabs(B[1]) < eps)
+    else if (Babs[0] < eps and Babs[1] < eps)
       FacetsTest[2] = 0; /* C = D. Test only ABC */
     else
     {
@@ -357,7 +292,7 @@ inline static void S3D(Simplex& s, Eigen::Vector3d& vv)
   if (FacetsTest[0] + FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 4)
   {
     /* All signs are equal, therefore the origin is inside the simplex */
-    inv_detM = 1 / detM;
+    double inv_detM = 1 / detM;
     s.lambdas[3] = B[0] * inv_detM;
     s.lambdas[2] = B[1] * inv_detM;
     s.lambdas[1] = B[2] * inv_detM;
@@ -372,7 +307,9 @@ inline static void S3D(Simplex& s, Eigen::Vector3d& vv)
   {
     /* There are three facets facing the origin  */
     Simplex sTmp;
+    Eigen::Vector4d tmplamda;
     sqdist_tmp = std::numeric_limits<double>::max();
+    int nclosestS = 0;
     int sID[4] = {0, 0, 0, 0};
     for (int i = 0; i < 3; ++i)
     {
@@ -383,22 +320,17 @@ inline static void S3D(Simplex& s, Eigen::Vector3d& vv)
         const int vtxid = TrianglesToTest[i + (k * 3)];
         sTmp.vrtx.row(2 - k) = s.vrtx.row(vtxid);
       }
-      /* ... and call S2D  */
-      S2D(sTmp, v);
-      /* ... compute aux squared distance */
-      vtmp.setZero();
-      for (int l = 0; l < sTmp.nvrtx; ++l)
-        vtmp += sTmp.lambdas[l] * sTmp.vrtx.row(l);
+      S2D(sTmp);
+      double vtmp_norm2 = sTmp.vec().squaredNorm();
 
-      if (vtmp.squaredNorm() < sqdist_tmp)
+      // ... compute aux squared distance
+      if (vtmp_norm2 < sqdist_tmp)
       {
-        sqdist_tmp = vtmp.squaredNorm();
+        sqdist_tmp = vtmp_norm2;
         nclosestS = sTmp.nvrtx;
+        tmplamda = sTmp.lambdas;
         for (int l = 0; l < nclosestS; ++l)
-        {
           sID[l] = TrianglesToTest[i + (sTmp.wids[l] * 3)];
-          tmplamda[l] = sTmp.lambdas[l];
-        }
       }
     }
 
@@ -406,10 +338,10 @@ inline static void S3D(Simplex& s, Eigen::Vector3d& vv)
 
     /* Store closest simplex */
     s.nvrtx = nclosestS;
+    s.lambdas = tmplamda;
     for (int i = 0; i < s.nvrtx; ++i)
     {
       s.vrtx.row(nclosestS - 1 - i) = tmpscoo1.row(sID[i]);
-      s.lambdas[i] = tmplamda[i];
       s.wids[nclosestS - 1 - i] = sID[i];
     }
   }
@@ -426,13 +358,9 @@ inline static void S3D(Simplex& s, Eigen::Vector3d& vv)
       sTmp.vrtx.row(1) = s.vrtx.row(1);
       sTmp.vrtx.row(2) = s.vrtx.row(3);
       /* ... and call S2D  */
-      S2D(sTmp, v);
+      S2D(sTmp);
       /* ... compute aux squared distance */
-      vtmp.setZero();
-      for (int i = 0; i < sTmp.nvrtx; ++i)
-        vtmp += sTmp.lambdas[i] * sTmp.vrtx.row(i);
-
-      sqdist_tmp = vtmp.squaredNorm();
+      sqdist_tmp = sTmp.vec().squaredNorm();
       Flag_sAuxused = 1;
       firstaux = 0;
     }
@@ -445,14 +373,9 @@ inline static void S3D(Simplex& s, Eigen::Vector3d& vv)
         sTmp.vrtx.row(1) = s.vrtx.row(2);
         sTmp.vrtx.row(2) = s.vrtx.row(3);
         /* ... and call S2D  */
-        S2D(sTmp, v);
+        S2D(sTmp);
         /* ... compute aux squared distance */
-
-        vtmp.setZero();
-        for (int i = 0; i < sTmp.nvrtx; ++i)
-          vtmp += sTmp.lambdas[i] * sTmp.vrtx.row(i);
-
-        sqdist_tmp = vtmp.squaredNorm();
+        sqdist_tmp = sTmp.vec().squaredNorm();
         firstaux = 1;
       }
       else
@@ -461,7 +384,7 @@ inline static void S3D(Simplex& s, Eigen::Vector3d& vv)
         s.vrtx.row(1) = s.vrtx.row(2);
         s.vrtx.row(2) = s.vrtx.row(3);
         /* ... and call S2D itself */
-        S2D(s, v);
+        S2D(s);
         secondaux = 1;
       }
     }
@@ -474,15 +397,12 @@ inline static void S3D(Simplex& s, Eigen::Vector3d& vv)
       s.vrtx.row(1) = s.vrtx.row(2);
       s.vrtx.row(2) = s.vrtx.row(3);
       /* ... and call S2D  */
-      S2D(s, v);
+      S2D(s);
       secondaux = 2;
     }
-    /* Compare outcomes */
-    v.setZero();
-    for (int i = 0; i < s.nvrtx; ++i)
-      v += s.lambdas[i] * s.vrtx.row(i);
 
-    if (v.squaredNorm() < sqdist_tmp)
+    // Compare outcomes
+    if (s.vec().squaredNorm() < sqdist_tmp)
     {
       /* Keep simplex. Need to update sID only*/
       for (int i = 0; i < s.nvrtx; ++i)
@@ -494,10 +414,10 @@ inline static void S3D(Simplex& s, Eigen::Vector3d& vv)
     else
     {
       s.nvrtx = sTmp.nvrtx;
+      s.vrtx = sTmp.vrtx;
+      s.lambdas = sTmp.lambdas;
       for (int i = 0; i < s.nvrtx; ++i)
       {
-        s.vrtx.row(i) = sTmp.vrtx.row(i);
-        s.lambdas[i] = sTmp.lambdas[i];
         s.wids[sTmp.nvrtx - 1 - i]
             = TrianglesToTest[firstaux + (sTmp.wids[i] * 3)];
       }
@@ -512,49 +432,40 @@ inline static void S3D(Simplex& s, Eigen::Vector3d& vv)
       s.nvrtx = 3;
       s.vrtx.row(1) = s.vrtx.row(1);
       s.vrtx.row(2) = s.vrtx.row(3);
-      S2D(s, v);
+      S2D(s);
     }
     else if (FacetsTest[2] == 0)
     {
-      /* The origin projection P faces the facet ABD */
+      // The origin projection P faces the facet ABD
       s.nvrtx = 3;
       s.vrtx.row(1) = s.vrtx.row(2);
       s.vrtx.row(2) = s.vrtx.row(3);
-      S2D(s, v);
-      /* Keep simplex. Need to update sID only*/
+      S2D(s);
+      // Keep simplex. Need to update sID only
+      // Assume that vertex a is always included in sID.
       for (int i = 2; i < s.nvrtx; ++i)
-      {
-        /* Assume that vertex a is always included in sID. */
         ++s.wids[i];
-      }
     }
     else if (FacetsTest[3] == 0)
     {
-      /* The origin projection P faces the facet ABC */
+      // The origin projection P faces the facet ABC
       s.nvrtx = 3;
       s.vrtx.row(0) = s.vrtx.row(1);
       s.vrtx.row(1) = s.vrtx.row(2);
       s.vrtx.row(2) = s.vrtx.row(3);
-      S2D(s, v);
+      S2D(s);
     }
   }
   else
   {
-    /* The origin projection P faces the facet BCD */
+    // The origin projection P faces the facet BCD
     s.nvrtx = 3;
-    /* ... and call S2D   */
-    S2D(s, v);
-    /* Keep simplex. Need to update sID only*/
+    S2D(s);
+    // Keep simplex. Need to update sID only
+    // Assume that vertex a is always included in sID.
     for (int i = 0; i < s.nvrtx; ++i)
-    {
-      /* Assume that vertex a is always included in sID. */
       ++s.wids[i];
-    }
   }
-
-  vv.setZero();
-  for (int i = 0; i < s.nvrtx; ++i)
-    vv += s.lambdas[i] * s.vrtx.row(i);
 }
 
 //-------------------------------------------------------
@@ -569,18 +480,18 @@ void support(
     bs = body.row(i);
 }
 //-----------------------------------------------------
-void subalgorithm(Simplex& s, Eigen::Vector3d& v)
+void subalgorithm(Simplex& s)
 {
   switch (s.nvrtx)
   {
   case 4:
-    S3D(s, v);
+    S3D(s);
     break;
   case 3:
-    S2D(s, v);
+    S2D(s);
     break;
   case 2:
-    v = S1D(s);
+    S1D(s);
     break;
   }
 }
@@ -594,10 +505,6 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
   double eps_rel = 1e-5;  /**< Tolerance on relative distance */
   double eps_tot = 1e-15; /**< Tolerance on absolute distance */
 
-#ifdef ADAPTIVEFP
-  exactinit();
-#endif
-
   double eps_rel2 = eps_rel * eps_rel;
 
   /* Initialise  */
@@ -606,8 +513,6 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
   Eigen::Vector3d bd2s = bd2.row(0);
   Eigen::Vector3d v = bd1s - bd2s;
   s.vrtx.row(0) = v;
-  // s.p.row(0) = bd1.s;
-  // s.q.row(0) = bd2.s;
 
   /* Begin GJK iteration */
   do
@@ -634,10 +539,8 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
     ++s.nvrtx;
 
     /* Invoke distance sub-algorithm */
-    subalgorithm(s, v);
-
-    // s.p.row(s.nvrtx - 1) = bd1.s;
-    // s.q.row(s.nvrtx - 1) = bd2.s;
+    subalgorithm(s);
+    v = s.vec();
 
     /* 3rd exit condition */
     double norm2Wmax = 0;
