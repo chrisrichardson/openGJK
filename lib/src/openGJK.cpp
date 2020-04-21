@@ -1,3 +1,5 @@
+
+
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  *
  *                                   #####        # #    #                *
  *       ####  #####  ###### #    # #     #       # #   #                 *
@@ -8,19 +10,6 @@
  *       ####  #      ###### #    #  #####   #####  #    #                *
  *                                                                        *
  *  This file is part of openGJK.                                         *
- *                                                                        *
- *  openGJK is free software: you can redistribute it and/or modify       *
- *   it under the terms of the GNU General Public License as published by *
- *   the Free Software Foundation, either version 3 of the License, or    *
- *   any later version.                                                   *
- *                                                                        *
- *   openGJK is distributed in the hope that it will be useful,           *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of       *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See The        *
- *   GNU General Public License for more details.                         *
- *                                                                        *
- *  You should have received a copy of the GNU General Public License     *
- *   along with Foobar.  If not, see <https://www.gnu.org/licenses/>.     *
  *                                                                        *
  *       openGJK: open-source Gilbert-Johnson-Keerthi algorithm           *
  *            Copyright (C) Mattia Montanari 2018 - 2019                  *
@@ -46,7 +35,7 @@
 class Simplex
 {
 public:
-  // Return a vector based on current coordinates and lambdas
+  /// Return a vector based on current coordinates and lambdas
   Eigen::Vector3d vec() const
   {
     Eigen::Vector3d vv;
@@ -56,38 +45,28 @@ public:
     return vv;
   }
 
-  // Number of active vertices (1=point, 2=line, 3=triangle, 4=tetrahedron)
+  /// Number of active vertices (1=point, 2=line, 3=triangle, 4=tetrahedron)
   int nvrtx;
-  // Vertex coordinates
+  /// Vertex coordinates
   Eigen::Matrix<double, 4, 3, Eigen::RowMajor> vrtx;
-  // Vertex IDs
+  /// Vertex IDs
   Eigen::Vector4i wids;
-  // Barycentric coordinates
+  /// Barycentric coordinates
   Eigen::Vector4d lambdas;
 };
-
-/**
- * @file openGJK.c
- * @author Mattia Montanari
- * @date April 2018
- * @brief File containing entire implementation of the GJK algorithm.
- *
- */
 
 /// @brief Finds point of minimum norm of 1-simplex. Robust, but slower,
 /// version of algorithm presented in paper.
 void S1D(Simplex& s)
 {
-  Eigen::Vector3d b = s.vrtx.row(0);
-  Eigen::Vector3d a = s.vrtx.row(1);
-  Eigen::Vector3d t = b - a;
+  Eigen::Vector3d t = s.vrtx.row(0) - s.vrtx.row(1);
 
-  /* Project origin onto the 1D simplex - line */
-  double pt = b.dot(t) / t.squaredNorm();
+  // Project origin onto the 1D simplex - line
+  double pt = s.vrtx.row(0).dot(t) / t.squaredNorm();
 
   if (pt >= 0.0 and pt <= 1.0)
   {
-    /* The origin is between A and B */
+    // The origin is between A and B
     s.lambdas[0] = 1.0 - pt;
     s.lambdas[1] = pt;
     s.wids[0] = 0;
@@ -96,7 +75,7 @@ void S1D(Simplex& s)
   }
   else if (pt > 1.0)
   {
-    /* The origin is beyond A */
+    // The origin is beyond A
     s.lambdas[0] = 1;
     s.wids[0] = 0;
     s.nvrtx = 1;
@@ -104,7 +83,7 @@ void S1D(Simplex& s)
   }
   else
   {
-    /* The origin is behind B */
+    // The origin is behind B
     s.lambdas[0] = 1;
     s.wids[0] = 1;
     s.nvrtx = 1;
@@ -115,26 +94,21 @@ void S1D(Simplex& s)
 /// version of algorithm presented in paper.
 void S2D(Simplex& s)
 {
-  Eigen::Vector3d v, vtmp;
-  Eigen::Vector3d a, b, c, s21, s31;
+  Eigen::Vector3d a, b, c;
   c = s.vrtx.row(0);
   b = s.vrtx.row(1);
   a = s.vrtx.row(2);
-  s21 = b - a;
-  s31 = c - a;
 
   /* Find best axis for projection */
-  Eigen::Vector3d nu_test = a.cross(b) + b.cross(c) + c.cross(a);
-  Eigen::Vector3d nu_fabs = nu_test.cwiseAbs();
+  Eigen::Vector3d n = a.cross(b) + b.cross(c) + c.cross(a);
+  Eigen::Vector3d nu_fabs = n.cwiseAbs();
   int indexI;
   nu_fabs.maxCoeff(&indexI);
-  double nu_max = nu_test[indexI];
+  double nu_max = n[indexI];
   int indexJ[2] = {(indexI + 1) % 3, (indexI + 2) % 3};
-  Eigen::Vector3d n = s21.cross(s31);
   n.normalize();
 
   double dotNA = n.dot(a);
-
   double pp[2] = {dotNA * n[indexJ[0]], dotNA * n[indexJ[1]]};
 
   /* Compute signed determinants */
@@ -157,13 +131,12 @@ void S2D(Simplex& s)
     l = i;
   }
 
-  /* Test if sign of ABC is equal to the signes of the auxiliary simplices */
+  // Test if sign of ABC is equal to the signs of the auxiliary simplices
   int FacetsTest[3];
   for (int i = 0; i < 3; ++i)
     FacetsTest[i] = (std::signbit(nu_max) == std::signbit(B[i]));
 
-  // The nan check was not included originally and will be removed in v2.0
-  if (FacetsTest[1] + FacetsTest[2] == 0 or std::isnan(n[0]))
+  if (FacetsTest[1] == 0 and FacetsTest[2] == 0)
   {
     Simplex sTmp;
 
@@ -172,17 +145,14 @@ void S2D(Simplex& s)
 
     sTmp.vrtx.row(0) = s.vrtx.row(1);
     sTmp.vrtx.row(1) = s.vrtx.row(2);
-    // s.vrtx.row(0) = s.vrtx.row(0);
     s.vrtx.row(1) = s.vrtx.row(2);
 
     S1D(sTmp);
     S1D(s);
-    vtmp = sTmp.vec();
-    v = s.vec();
 
-    if (v.squaredNorm() < vtmp.squaredNorm())
+    if (s.vec().squaredNorm() < sTmp.vec().squaredNorm())
     {
-      /* Keep simplex. Need to update sID only*/
+      // Keep simplex. Need to update sID only
       for (int i = 1; i < s.nvrtx; ++i)
         ++s.wids[i];
     }
@@ -198,11 +168,11 @@ void S2D(Simplex& s)
   }
   else if ((FacetsTest[0] + FacetsTest[1] + FacetsTest[2]) == 3)
   {
-    /* The origin projections lays onto the triangle */
+    // The origin projections lays onto the triangle
     double inv_detM = 1 / nu_max;
     s.lambdas[0] = B[2] * inv_detM;
     s.lambdas[1] = B[1] * inv_detM;
-    s.lambdas[2] = 1 - s.lambdas[0] - s.lambdas[1];
+    s.lambdas[2] = 1.0 - s.lambdas[0] - s.lambdas[1];
     s.wids[0] = 0;
     s.wids[1] = 1;
     s.wids[2] = 2;
@@ -210,7 +180,7 @@ void S2D(Simplex& s)
   }
   else if (FacetsTest[2] == 0)
   {
-    /* The origin projection P faces the segment AB */
+    // The origin projection P faces the segment AB
     s.nvrtx = 2;
     s.vrtx.row(0) = s.vrtx.row(1);
     s.vrtx.row(1) = s.vrtx.row(2);
@@ -218,7 +188,7 @@ void S2D(Simplex& s)
   }
   else if (FacetsTest[1] == 0)
   {
-    /* The origin projection P faces the segment AC */
+    // The origin projection P faces the segment AC
     s.nvrtx = 2;
     s.vrtx.row(1) = s.vrtx.row(2);
     S1D(s);
@@ -227,7 +197,7 @@ void S2D(Simplex& s)
   }
   else
   {
-    /* The origin projection P faces the segment BC */
+    // The origin projection P faces the segment BC
     s.nvrtx = 2;
     S1D(s);
   }
@@ -463,7 +433,6 @@ void S3D(Simplex& s)
       ++s.wids[i];
   }
 }
-
 //-------------------------------------------------------
 void support(
     Eigen::Vector3d& bs,
