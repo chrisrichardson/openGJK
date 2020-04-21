@@ -38,6 +38,7 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
+#include <iostream>
 
 #define SAMESIGN(a, b) ((a > 0) == (b > 0))
 
@@ -49,7 +50,7 @@ class Simplex
 public:
   int nvrtx;
   Eigen::Matrix<double, 4, 3, Eigen::RowMajor> vrtx;
-  int wids[4];
+  Eigen::Vector4i wids;
   Eigen::Vector4d lambdas;
   // Eigen::Matrix<double, 4, 3, Eigen::RowMajor> p;
   // Eigen::Matrix<double, 4, 3, Eigen::RowMajor>  q;
@@ -133,32 +134,22 @@ void S2D(Simplex& s, Eigen::Vector3d& vv)
 
   /* Find best axis for projection */
   Eigen::Vector3d nu_test = a.cross(b) + b.cross(c) + c.cross(a);
-
-  // int k = 1;
-  // int l = 2;
-  // for (int i = 0; i < 3; ++i)
-  // {
-  //   nu_test[i] = b[k] * c[l] + a[k] * b[l] + c[k] * a[l] - b[k] * a[l]
-  //                - c[k] * b[l] - a[k] * c[l];
-  //   k = l;
-  //   l = i;
-  // }
-
   Eigen::Vector3d nu_fabs = nu_test.cwiseAbs();
   int indexI;
   nu_fabs.maxCoeff(&indexI);
   double nu_max = nu_test[indexI];
   int indexJ[2] = {(indexI + 1) % 3, (indexI + 2) % 3};
 
-  int k = 1;
-  int l = 2;
-  Eigen::Vector3d n;
-  for (int i = 0; i < 3; ++i)
-  {
-    n[i] = s21[k] * s31[l] - s21[l] * s31[k];
-    k = l;
-    l = i;
-  }
+  // int k = 1;
+  // int l = 2;
+  // Eigen::Vector3d n;
+  // for (int i = 0; i < 3; ++i)
+  // {
+  //   n[i] = s21[k] * s31[l] - s21[l] * s31[k];
+  //   k = l;
+  //   l = i;
+  // }
+  Eigen::Vector3d n = s21.cross(s31);
   n.normalize();
 
   double dotNA = n.dot(a);
@@ -175,8 +166,8 @@ void S2D(Simplex& s, Eigen::Vector3d& vv)
   ss[2][0] = c[indexJ[0]];
   ss[2][1] = c[indexJ[1]];
 
-  k = 1;
-  l = 2;
+  int k = 1;
+  int l = 2;
   Eigen::Vector3d B;
   for (int i = 0; i < 3; ++i)
   {
@@ -214,19 +205,11 @@ void S2D(Simplex& s, Eigen::Vector3d& vv)
 
     sTmp.vrtx.row(0) = s.vrtx.row(1);
     sTmp.vrtx.row(1) = s.vrtx.row(2);
-    s.vrtx.row(0) = s.vrtx.row(0);
+    // s.vrtx.row(0) = s.vrtx.row(0);
     s.vrtx.row(1) = s.vrtx.row(2);
 
-    S1D(sTmp, v);
+    S1D(sTmp, vtmp);
     S1D(s, v);
-
-    vtmp.setZero();
-    v.setZero();
-    for (int i = 0; i < sTmp.nvrtx; ++i)
-    {
-      vtmp += sTmp.lambdas[i] * sTmp.vrtx.row(i);
-      v += s.lambdas[i] * s.vrtx.row(i);
-    }
 
     if (v.squaredNorm() < vtmp.squaredNorm())
     {
@@ -237,16 +220,14 @@ void S2D(Simplex& s, Eigen::Vector3d& vv)
     else
     {
       s.nvrtx = sTmp.nvrtx;
-      for (int j = 0; j < 3; ++j)
+      s.vrtx = sTmp.vrtx;
+      s.lambdas = sTmp.lambdas;
+
+      for (int i = 0; i < s.nvrtx; ++i)
       {
-        for (int i = 0; i < s.nvrtx; ++i)
-        {
-          s.vrtx(i, j) = s.vrtx(i, j);
-          s.lambdas[i] = sTmp.lambdas[i];
-          /* No need to convert sID here since sTmp deal with the vertices A
-           * and B. ;*/
-          s.wids[i] = sTmp.wids[i];
-        }
+        /* No need to convert sID here since sTmp deal with the vertices A
+         * and B. ;*/
+        s.wids[i] = sTmp.wids[i];
       }
     }
   }
@@ -305,7 +286,7 @@ inline static void S3D(Simplex& s, Eigen::Vector3d& vv)
   int secondaux = 0;
   int Flag_sAuxused = 0;
   Eigen::Vector3d v, vtmp;
-  double B[4];
+  Eigen::Vector4d B;
   double tmplamda[4] = {0, 0, 0, 0};
   double sqdist_tmp = 0;
   double detM;
@@ -318,6 +299,17 @@ inline static void S3D(Simplex& s, Eigen::Vector3d& vv)
   Eigen::Vector3d b = s.vrtx.row(2);
   Eigen::Vector3d c = s.vrtx.row(1);
   Eigen::Vector3d d = s.vrtx.row(0);
+
+  // Eigen::Matrix3d mtmp;
+  // mtmp.row(0) = s.vrtx.row(0);
+  // mtmp.row(1) = s.vrtx.row(2);
+  // mtmp.row(2) = s.vrtx.row(3);
+
+  // B[3] = -s.vrtx.bottomRows(3).determinant();
+  // B[2] = mtmp.determinant();
+  // mtmp.row(1) = s.vrtx.row(1);
+  // B[1] = -mtmp.determinant();
+  // B[0] = s.vrtx.topRows(3).determinant();
 
 #ifndef ADAPTIVEFP
   B[0] = -1
@@ -332,7 +324,8 @@ inline static void S3D(Simplex& s, Eigen::Vector3d& vv)
   B[3] = +1
          * (a[0] * b[1] * c[2] + a[1] * b[2] * c[0] + a[2] * b[0] * c[1]
             - a[2] * b[1] * c[0] - a[1] * b[0] * c[2] - a[0] * b[2] * c[1]);
-  detM = B[0] + B[1] + B[2] + B[3];
+
+  detM = B.sum();
 #else
   B[0] = orient3d(o, b, c, d);
   B[1] = orient3d(a, o, c, d);
@@ -388,7 +381,7 @@ inline static void S3D(Simplex& s, Eigen::Vector3d& vv)
   {
     /* There are three facets facing the origin  */
     Simplex sTmp;
-    sqdist_tmp = -1;
+    sqdist_tmp = std::numeric_limits<double>::max();
     int sID[4] = {0, 0, 0, 0};
     for (int i = 0; i < 3; ++i)
     {

@@ -1,5 +1,10 @@
 {
     "editor.formatOnSave": true,
     "editor.defaultFormatter": "xaver.clang-format",
-    "clang-format.executable": "clang-format-9"
+    "clang-format.executable": "clang-format-9",
+    "python.formatting.provider": "autopep8",
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true,
+    "python.linting.enabled": true,
+    "python.pythonPath": "python:${workspaceFolder}/**"
 }
