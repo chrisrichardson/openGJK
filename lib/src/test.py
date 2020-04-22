@@ -71,7 +71,7 @@ def test_tri_collision2d(delta):
     assert(np.isclose(distance, actual_distance))
 
 
-@pytest.mark.parametrize("delta", [1*0.5**(3*i) for i in range(8)])
+@pytest.mark.parametrize("delta", [1*0.5**(3*i) for i in range(7)])
 def test_tetra_distance_3d(delta):
     tetra_1 = np.array([[0, 0, 0.2], [1, 0, 0.1], [0, 1, 0.3],
                         [0, 0, 1]], dtype=np.float64)
@@ -84,7 +84,7 @@ def test_tetra_distance_3d(delta):
     assert(np.isclose(distance, actual_distance))
 
 
-@pytest.mark.parametrize("delta", [1*0.1**(3*i) for i in range(8)])
+@pytest.mark.parametrize("delta", [1*0.1**(3*i) for i in range(6)])
 def test_tetra_collision_3d(delta):
     tetra_1 = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0],
                         [0, 0, 1]], dtype=np.float64)
