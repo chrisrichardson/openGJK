@@ -45,7 +45,7 @@
  */
 
 #define _CRT_HAS_CXX17 0
-#include "openGJK/openGJK.h"
+#include "openGJK.h"
 #include <stdio.h>
 
 /* If instricuted, uses adaptive floating point arithmetics. */
