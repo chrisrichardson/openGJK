@@ -72,104 +72,65 @@ void S1D(Simplex& s)
     s.wids[0] = 0;
     s.wids[1] = 1;
     s.nvrtx = 2;
+    return;
   }
-  else if (pt > 1.0)
+
+  if (pt > 1.0)
   {
     // The origin is beyond A
     s.lambdas[0] = 1;
     s.wids[0] = 0;
     s.nvrtx = 1;
     s.vrtx.row(0) = s.vrtx.row(1);
+    return;
   }
-  else
-  {
-    // The origin is behind B
-    s.lambdas[0] = 1;
-    s.wids[0] = 1;
-    s.nvrtx = 1;
-  }
+
+  // pt < 0.0
+  // The origin is behind B
+  s.lambdas[0] = 1;
+  s.wids[0] = 1;
+  s.nvrtx = 1;
 }
 
 /// @brief Finds point of minimum norm of 2-simplex. Robust, but slower,
 /// version of algorithm presented in paper.
 void S2D(Simplex& s)
 {
-  Eigen::Vector3d a, b, c;
-  c = s.vrtx.row(0);
-  b = s.vrtx.row(1);
-  a = s.vrtx.row(2);
+  const Eigen::Vector3d c = s.vrtx.row(0);
+  const Eigen::Vector3d b = s.vrtx.row(1);
+  const Eigen::Vector3d a = s.vrtx.row(2);
 
-  /* Find best axis for projection */
+  // Find best axis for projection
   Eigen::Vector3d n = a.cross(b) + b.cross(c) + c.cross(a);
   Eigen::Vector3d nu_fabs = n.cwiseAbs();
   int indexI;
   nu_fabs.maxCoeff(&indexI);
-  double nu_max = n[indexI];
-  int indexJ[2] = {(indexI + 1) % 3, (indexI + 2) % 3};
+  const double nu_max = n[indexI];
+  const int indexJ0 = (indexI + 1) % 3;
+  const int indexJ1 = (indexI + 2) % 3;
   n.normalize();
+  const double dotNA = n.dot(a);
 
-  double dotNA = n.dot(a);
-  double pp[2] = {dotNA * n[indexJ[0]], dotNA * n[indexJ[1]]};
-
-  /* Compute signed determinants */
-  double ss[3][2];
-  ss[0][0] = a[indexJ[0]];
-  ss[0][1] = a[indexJ[1]];
-  ss[1][0] = b[indexJ[0]];
-  ss[1][1] = b[indexJ[1]];
-  ss[2][0] = c[indexJ[0]];
-  ss[2][1] = c[indexJ[1]];
-
-  int k = 1;
-  int l = 2;
   Eigen::Vector3d B;
-  for (int i = 0; i < 3; ++i)
-  {
-    B[i] = pp[0] * ss[k][1] + pp[1] * ss[l][0] + ss[k][0] * ss[l][1]
-           - pp[0] * ss[l][1] - pp[1] * ss[k][0] - ss[l][0] * ss[k][1];
-    k = l;
-    l = i;
-  }
+  Eigen::Matrix3d M;
+  M.row(0) << s.vrtx(2, indexJ0), s.vrtx(2, indexJ1), 1.0;
+  M.row(1) << s.vrtx(1, indexJ0), s.vrtx(1, indexJ1), 1.0;
+  M.row(2) << dotNA * n[indexJ0], dotNA * n[indexJ1], 1.0;
+  B[2] = M.determinant();
+  M.row(1) << s.vrtx(0, indexJ0), s.vrtx(0, indexJ1), 1.0;
+  B[1] = -M.determinant();
+  M.row(0) << s.vrtx(1, indexJ0), s.vrtx(1, indexJ1), 1.0;
+  B[0] = M.determinant();
 
   // Test if sign of ABC is equal to the signs of the auxiliary simplices
   int FacetsTest[3];
   for (int i = 0; i < 3; ++i)
     FacetsTest[i] = (std::signbit(nu_max) == std::signbit(B[i]));
 
-  if (FacetsTest[1] == 0 and FacetsTest[2] == 0)
-  {
-    Simplex sTmp;
-
-    sTmp.nvrtx = 2;
-    s.nvrtx = 2;
-
-    sTmp.vrtx.row(0) = s.vrtx.row(1);
-    sTmp.vrtx.row(1) = s.vrtx.row(2);
-    s.vrtx.row(1) = s.vrtx.row(2);
-
-    S1D(sTmp);
-    S1D(s);
-
-    if (s.vec().squaredNorm() < sTmp.vec().squaredNorm())
-    {
-      // Keep simplex. Need to update sID only
-      for (int i = 1; i < s.nvrtx; ++i)
-        ++s.wids[i];
-    }
-    else
-    {
-      s.nvrtx = sTmp.nvrtx;
-      s.vrtx = sTmp.vrtx;
-      s.lambdas = sTmp.lambdas;
-      // No need to convert sID here
-      // since sTmp deals with the vertices A and B.
-      s.wids = sTmp.wids;
-    }
-  }
-  else if ((FacetsTest[0] + FacetsTest[1] + FacetsTest[2]) == 3)
+  if ((FacetsTest[0] + FacetsTest[1] + FacetsTest[2]) == 3)
   {
     // The origin projections lays onto the triangle
-    double inv_detM = 1 / nu_max;
+    const double inv_detM = 1 / nu_max;
     s.lambdas[0] = B[2] * inv_detM;
     s.lambdas[1] = B[1] * inv_detM;
     s.lambdas[2] = 1.0 - s.lambdas[0] - s.lambdas[1];
@@ -177,55 +138,80 @@ void S2D(Simplex& s)
     s.wids[1] = 1;
     s.wids[2] = 2;
     s.nvrtx = 3;
+    return;
   }
-  else if (FacetsTest[2] == 0)
+
+  if (FacetsTest[1] == 0 and FacetsTest[2] == 0)
+  {
+    Simplex sTmp;
+    sTmp.nvrtx = 2;
+    sTmp.vrtx.row(0) = s.vrtx.row(1);
+    sTmp.vrtx.row(1) = s.vrtx.row(2);
+    S1D(sTmp);
+
+    s.nvrtx = 2;
+    s.vrtx.row(1) = s.vrtx.row(2);
+    S1D(s);
+
+    if (s.vec().squaredNorm() < sTmp.vec().squaredNorm())
+    {
+      // Keep simplex. Update sID.
+      s.wids[1] = 2;
+    }
+    else
+      s = sTmp;
+
+    return;
+  }
+
+  if (FacetsTest[2] == 0)
   {
     // The origin projection P faces the segment AB
     s.nvrtx = 2;
     s.vrtx.row(0) = s.vrtx.row(1);
     s.vrtx.row(1) = s.vrtx.row(2);
     S1D(s);
+    return;
   }
-  else if (FacetsTest[1] == 0)
+
+  if (FacetsTest[1] == 0)
   {
     // The origin projection P faces the segment AC
     s.nvrtx = 2;
     s.vrtx.row(1) = s.vrtx.row(2);
     S1D(s);
-    for (int i = 1; i < s.nvrtx; ++i)
-      ++s.wids[i];
+    s.wids[1] = 2;
+    return;
   }
-  else
-  {
-    // The origin projection P faces the segment BC
-    s.nvrtx = 2;
-    S1D(s);
-  }
+
+  // FacetsTest[0] == 0
+  // The origin projection P faces the segment BC
+  s.nvrtx = 2;
+  S1D(s);
 }
 //-------------------------------------------------------
-/// @brief Finds point of minimum norm of 3-simplex. Robust, but slower, version
-/// of algorithm presented in paper.
+/// @brief Finds point of minimum norm of 3-simplex. Robust, but slower,
+/// version of algorithm presented in paper.
 void S3D(Simplex& s)
 {
   int FacetsTest[4] = {1, 1, 1, 1};
   static const int TrianglesToTest[9] = {3, 3, 3, 1, 2, 2, 0, 0, 1};
   int firstaux = 0;
   int secondaux = 0;
-  int Flag_sAuxused = 0;
   double sqdist_tmp = 0;
 
-  Eigen::Matrix3d mtmp = s.vrtx.bottomRows(3);
+  Eigen::Matrix3d M = s.vrtx.bottomRows(3);
   Eigen::Vector4d B;
-  B[3] = -mtmp.determinant();
-  mtmp.row(0) = s.vrtx.row(0);
-  B[2] = mtmp.determinant();
-  mtmp.row(1) = s.vrtx.row(1);
-  B[1] = -mtmp.determinant();
-  mtmp.row(2) = s.vrtx.row(2);
-  B[0] = mtmp.determinant();
+  B[3] = -M.determinant();
+  M.row(0) = s.vrtx.row(0);
+  B[2] = M.determinant();
+  M.row(1) = s.vrtx.row(1);
+  B[1] = -M.determinant();
+  M.row(2) = s.vrtx.row(2);
+  B[0] = M.determinant();
   double detM = B.sum();
 
-  /* Test if sign of ABCD is equal to the signs of the auxiliary simplices */
+  // Test if sign of ABCD is equal to the signs of the auxiliary simplices
   double eps = 1e-13;
   if (std::abs(detM) < eps)
   {
@@ -257,8 +243,8 @@ void S3D(Simplex& s)
   // Compare signed volumes and compute barycentric coordinates
   if (FacetsTest[0] + FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 4)
   {
-    /* All signs are equal, therefore the origin is inside the simplex */
-    double inv_detM = 1 / detM;
+    // All signs are equal, therefore the origin is inside the simplex
+    const double inv_detM = 1 / detM;
     s.lambdas[3] = B[0] * inv_detM;
     s.lambdas[2] = B[1] * inv_detM;
     s.lambdas[1] = B[2] * inv_detM;
@@ -268,8 +254,10 @@ void S3D(Simplex& s)
     s.wids[2] = 2;
     s.wids[3] = 3;
     s.nvrtx = 4;
+    return;
   }
-  else if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 0)
+
+  if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 0)
   {
     // There are three facets facing the origin
     Simplex sTmp;
@@ -310,10 +298,12 @@ void S3D(Simplex& s)
       s.vrtx.row(nclosestS - 1 - i) = tmpscoo1.row(sID[i]);
       s.wids[nclosestS - 1 - i] = sID[i];
     }
+    return;
   }
-  else if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 1)
+
+  if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 1)
   {
-    /* There are two   facets facing the origin, need to find the closest.   */
+    // There are two facets facing the origin, need to find the closest.
     Simplex sTmp;
     sTmp.nvrtx = 3;
 
@@ -327,13 +317,12 @@ void S3D(Simplex& s)
       S2D(sTmp);
       /* ... compute aux squared distance */
       sqdist_tmp = sTmp.vec().squaredNorm();
-      Flag_sAuxused = 1;
       firstaux = 0;
     }
     if (FacetsTest[2] == 0)
     {
       /* ... Test facet ABD  */
-      if (Flag_sAuxused == 0)
+      if (FacetsTest[1] == 1)
       {
         sTmp.vrtx.row(0) = s.vrtx.row(0);
         sTmp.vrtx.row(1) = s.vrtx.row(2);
@@ -388,13 +377,15 @@ void S3D(Simplex& s)
             = TrianglesToTest[firstaux + (sTmp.wids[i] * 3)];
       }
     }
+    return;
   }
-  else if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 2)
+
+  if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 2)
   {
-    /* Only one facet is facing the origin */
+    // Only one facet is facing the origin
     if (FacetsTest[1] == 0)
     {
-      /* The origin projection P faces the facet ACD */
+      // The origin projection P faces the facet ACD
       s.nvrtx = 3;
       s.vrtx.row(1) = s.vrtx.row(1);
       s.vrtx.row(2) = s.vrtx.row(3);
@@ -421,17 +412,16 @@ void S3D(Simplex& s)
       s.vrtx.row(2) = s.vrtx.row(3);
       S2D(s);
     }
+    return;
   }
-  else
-  {
-    // The origin projection P faces the facet BCD
-    s.nvrtx = 3;
-    S2D(s);
-    // Keep simplex. Need to update sID only
-    // Assume that vertex a is always included in sID.
-    for (int i = 0; i < s.nvrtx; ++i)
-      ++s.wids[i];
-  }
+
+  // The origin projection P faces the facet BCD
+  s.nvrtx = 3;
+  S2D(s);
+  // Keep simplex. Need to update sID only
+  // Assume that vertex a is always included in sID.
+  for (int i = 0; i < s.nvrtx; ++i)
+    ++s.wids[i];
 }
 //-------------------------------------------------------
 void support(
