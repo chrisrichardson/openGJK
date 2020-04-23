@@ -296,8 +296,7 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
            Simplex& s)
 {
   int mk = 50;             // Maximum number of iterations of the GJK algorithm
-  double eps_rel2 = 1e-15; // Tolerance on relative distance
-  double eps_tot2 = 1e-15; // Tolerance on absolute distance
+  double eps_rel2 = 1e-25; // Tolerance on relative distance
 
   // Initialise
   s.nvrtx = 1;
@@ -306,6 +305,7 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
   Eigen::Vector3d v = bd1s - bd2s;
   s.vrtx.row(0) = v;
 
+  Eigen::Vector3d vlast;
   // Begin GJK iteration
   int k;
   for (k = 0; k < mk; ++k)
@@ -316,12 +316,11 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
 
     const double vnorm2 = v.squaredNorm();
     Eigen::Vector3d w = bd1s - bd2s;
-    std::cout << (vnorm2 - v.dot(w)) << "\n";
     // 1st exit condition
     if (vnorm2 - v.dot(w) < eps_rel2)
       break;
 
-    // 2nd exit condition
+    // 2nd exit condition - intersecting or touching
     if (vnorm2 < eps_rel2)
       break;
 
@@ -334,15 +333,19 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
 
     // Invoke distance sub-algorithm
     subalgorithm(s);
+    vlast = v;
     v = s.vec();
+    // Exit condition if no change in v
+    if ((vlast - v).squaredNorm() < 1e-30)
+      break;
 
     // 3rd exit condition
-    const Eigen::Vector4d nmax = s.vrtx.rowwise().squaredNorm();
-    double norm2Wmax = nmax.head(s.nvrtx).maxCoeff();
+    // const Eigen::Vector4d nmax = s.vrtx.rowwise().squaredNorm();
+    // double norm2Wmax = nmax.head(s.nvrtx).maxCoeff();
     // for (int i = 0; i < s.nvrtx; ++i)
     //   norm2Wmax = std::max(norm2Wmax, s.vrtx.row(i).squaredNorm());
-    if (v.squaredNorm() <= eps_tot2 * norm2Wmax)
-      break;
+    // if (v.squaredNorm() <= eps_tot2 * norm2Wmax)
+    //  break;
   }
   std::cout << "OpenGJK iterations = " << k << "\n";
 
