@@ -5,7 +5,8 @@ on: [push]
 jobs:
   build:
 
-    runs-on: dolfinx/real
+    runs-on: ubuntu-latest
+    container: dolfinx/real
 
     steps:
     - uses: actions/checkout@v2
