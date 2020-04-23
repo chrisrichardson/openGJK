@@ -81,7 +81,8 @@ def test_tri_distance(delta):
     point = tri_2[0]
     actual_distance = distance_point_to_line_3D(P1, P2, point)
     distance = opengjk.gjk(tri_1, tri_2)
-    print("Computed distance ", distance, actual_distance)
+    print("Computed distance ", distance, "Actual distance ", actual_distance)
+
     assert(np.isclose(distance, actual_distance, atol=1e-15))
 
 
@@ -96,7 +97,8 @@ def test_quad_distance2d(delta):
     point = quad_2[0]
     actual_distance = distance_point_to_line_3D(P1, P2, point)
     distance = opengjk.gjk(quad_1, quad_2)
-    print("Computed distance ", distance, actual_distance)
+    print("Computed distance ", distance, "Actual distance ", actual_distance)
+
     assert(np.isclose(distance, actual_distance, atol=1e-15))
 
 
@@ -109,11 +111,13 @@ def test_tetra_distance_3d(delta):
     actual_distance = distance_point_to_plane_3D(tetra_1[0], tetra_1[1],
                                                  tetra_1[2], tetra_2[3])
     distance = opengjk.gjk(tetra_1, tetra_2)
-    print("Computed distance ", distance, actual_distance)
+    print("Computed distance ", distance, "Actual distance ", actual_distance)
+
     assert(np.isclose(distance, actual_distance, atol=1e-15))
 
 
-@pytest.mark.parametrize("delta", [np.sqrt(2)*0.1**(3*i) for i in range(6)])
+@pytest.mark.parametrize("delta", [(-1)**i*np.sqrt(2)*0.1**(3*i)
+                                   for i in range(6)])
 def test_tetra_collision_3d(delta):
     tetra_1 = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0],
                         [0, 0, 1]], dtype=np.float64)
@@ -122,5 +126,40 @@ def test_tetra_collision_3d(delta):
     actual_distance = distance_point_to_plane_3D(tetra_1[0], tetra_1[1],
                                                  tetra_1[2], tetra_2[3])
     distance = opengjk.gjk(tetra_1, tetra_2)
-    print("Computed distance ", distance, actual_distance)
-    assert(np.isclose(distance, actual_distance, atol=1e-15))
+
+    if delta < 0:
+        assert(np.isclose(distance, 0, atol=1e-15))
+    else:
+        print("Computed distance ", distance,
+              "Actual distance ", actual_distance)
+        assert(np.isclose(distance, actual_distance, atol=1e-15))
+
+
+@pytest.mark.parametrize("delta", [0, -0.1, -0.49, -0.51])
+def test_hex_collision_3d(delta):
+    hex_1 = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0],
+                      [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]],
+                     dtype=np.float64)
+    P0 = np.array([1.5+delta, 1.5+delta, 0.5], dtype=np.float64)
+    P1 = np.array([2, 2, 1], dtype=np.float64)
+    P2 = np.array([2, 1.25, 0.25], dtype=np.float64)
+    P3 = P1 + P2 - P0
+    quad_1 = np.array([P0, P1, P2, P3], dtype=np.float64)
+    n = (np.cross(quad_1[1]-quad_1[0], quad_1[2]-quad_1[0]) /
+         np.linalg.norm(
+        np.cross(quad_1[1]-quad_1[0],
+                 quad_1[2]-quad_1[0])))
+    quad_2 = quad_1 + n
+    hex_2 = np.zeros((8, 3), dtype=np.float64)
+    hex_2[:4, :] = quad_1
+    hex_2[4:, :] = quad_2
+    actual_distance = np.linalg.norm(
+        np.array([1, 1, P0[2]], dtype=np.float64)-hex_2[0])
+    distance = opengjk.gjk(hex_1, hex_2)
+
+    if P0[0] < 1:
+        assert(np.isclose(distance, 0, atol=1e-15))
+    else:
+        print("Computed distance ", distance,
+              "Actual distance ", actual_distance)
+        assert(np.isclose(distance, actual_distance, atol=1e-15))
