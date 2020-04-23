@@ -45,7 +45,7 @@
  */
 
 #define _CRT_HAS_CXX17 0
-#include "openGJK/openGJK.h"
+#include "openGJK.h"
 #include <stdio.h>
 
 /* If instricuted, uses adaptive floating point arithmetics. */
@@ -885,7 +885,7 @@ double gjk(struct bd bd1, struct bd bd2, struct simplex* s)
   double vminus[3];     /**< Search direction * -1        */
   double w[3]; /**< Vertex on CSO boundary given by the difference of support
                   functions on both bodies */
-  double eps_rel = 1e-5;  /**< Tolerance on relative distance */
+  double eps_rel = 1e-7;  /**< Tolerance on relative distance */
   double eps_tot = 1e-15; /**< Tolerance on absolute distance */
   double norm2Wmax = 0;
   double tesnorm = 0;
