@@ -74,7 +74,7 @@ void S1D(Simplex& s)
     return;
   }
 
-  s.lambdas[0] = 1;
+  s.lambdas[0] = 1.0;
   s.nvrtx = 1;
   // The origin is beyond A, change point
   if (pt > 1.0)
@@ -107,9 +107,11 @@ void S2D(Simplex& s)
   M.row(1) << s.vrtx(1, indexJ0), s.vrtx(1, indexJ1), 1.0;
   M.row(2) << dotNA * n[indexJ0], dotNA * n[indexJ1], 1.0;
   B[2] = M.determinant();
-  M.row(1) << s.vrtx(0, indexJ0), s.vrtx(0, indexJ1), 1.0;
+  M(1, 0) = s.vrtx(0, indexJ0);
+  M(1, 1) = s.vrtx(0, indexJ1);
   B[1] = -M.determinant();
-  M.row(0) << s.vrtx(1, indexJ0), s.vrtx(1, indexJ1), 1.0;
+  M(0, 0) = s.vrtx(1, indexJ0);
+  M(0, 1) = s.vrtx(1, indexJ1);
   B[0] = M.determinant();
 
   // Test if sign of ABC is equal to the signs of the auxiliary simplices
@@ -230,122 +232,36 @@ void S3D(Simplex& s)
     return;
   }
 
-  if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 0)
+  if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 3)
   {
-    // There are three facets facing the origin
-    Simplex sTmp1;
-    sTmp1.nvrtx = 3;
-    // Assign coordinates to simplex
-    sTmp1.vrtx.row(0) = s.vrtx.row(0);
-    sTmp1.vrtx.row(1) = s.vrtx.row(1);
-    sTmp1.vrtx.row(2) = s.vrtx.row(3);
-    S2D(sTmp1);
-
-    Simplex sTmp2;
-    sTmp2.nvrtx = 3;
-    // Assign coordinates to simplex
-    sTmp2.vrtx.row(0) = s.vrtx.row(0);
-    sTmp2.vrtx.row(1) = s.vrtx.row(2);
-    sTmp2.vrtx.row(2) = s.vrtx.row(3);
-    S2D(sTmp2);
-
+    // The origin projection P faces the facet BCD
     s.nvrtx = 3;
-    // Assign coordinates to simplex
-    s.vrtx.row(0) = s.vrtx.row(1);
-    s.vrtx.row(1) = s.vrtx.row(2);
-    s.vrtx.row(2) = s.vrtx.row(3);
     S2D(s);
-
-    // ... compute aux squared distance
-    if (sTmp2.vec().squaredNorm() < s.vec().squaredNorm())
-      s = sTmp2;
-    if (sTmp1.vec().squaredNorm() < s.vec().squaredNorm())
-      s = sTmp1;
     return;
   }
 
-  if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 1)
+  // Either 1, 2 or 3 of ACD, ABD or ABC are closest.
+  Simplex sTmp, sBest;
+  static const int facets[3][3] = {{0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
+  double vmin = std::numeric_limits<double>::max();
+  for (int i = 0; i < 3; ++i)
   {
-    // There are two facets facing the origin, need to find the closest.
-    Simplex sTmp;
-    sTmp.nvrtx = 3;
-
-    if (FacetsTest[1] == 0)
+    if (FacetsTest[i + 1] == 0)
     {
-      // Test facet ACD
-      sTmp.vrtx.row(0) = s.vrtx.row(0);
-      sTmp.vrtx.row(1) = s.vrtx.row(1);
-      sTmp.vrtx.row(2) = s.vrtx.row(3);
+      sTmp.nvrtx = 3;
+      sTmp.vrtx.row(0) = s.vrtx.row(facets[i][0]);
+      sTmp.vrtx.row(1) = s.vrtx.row(facets[i][1]);
+      sTmp.vrtx.row(2) = s.vrtx.row(facets[i][2]);
       S2D(sTmp);
-    }
-
-    if (FacetsTest[2] == 0)
-    {
-      // Test facet ABD
-      if (FacetsTest[1] == 1)
+      double vnorm = sTmp.vec().squaredNorm();
+      if (vnorm < vmin)
       {
-        sTmp.vrtx.row(0) = s.vrtx.row(0);
-        sTmp.vrtx.row(1) = s.vrtx.row(2);
-        sTmp.vrtx.row(2) = s.vrtx.row(3);
-        S2D(sTmp);
-      }
-      else
-      {
-        s.nvrtx = 3;
-        s.vrtx.row(1) = s.vrtx.row(2);
-        s.vrtx.row(2) = s.vrtx.row(3);
-        S2D(s);
+        vmin = vnorm;
+        sBest = sTmp;
       }
     }
-
-    if (FacetsTest[3] == 0)
-    {
-      // Test facet ABC
-      s.nvrtx = 3;
-      s.vrtx.row(0) = s.vrtx.row(1);
-      s.vrtx.row(1) = s.vrtx.row(2);
-      s.vrtx.row(2) = s.vrtx.row(3);
-      S2D(s);
-    }
-
-    // Compare outcomes
-    if (sTmp.vec().squaredNorm() < s.vec().squaredNorm())
-      s = sTmp;
-    return;
   }
-
-  if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 2)
-  {
-    s.nvrtx = 3;
-    // Only one facet is facing the origin
-    if (FacetsTest[1] == 0)
-    {
-      // The origin projection P faces the facet ACD
-      s.vrtx.row(1) = s.vrtx.row(1);
-      s.vrtx.row(2) = s.vrtx.row(3);
-      S2D(s);
-    }
-    else if (FacetsTest[2] == 0)
-    {
-      // The origin projection P faces the facet ABD
-      s.vrtx.row(1) = s.vrtx.row(2);
-      s.vrtx.row(2) = s.vrtx.row(3);
-      S2D(s);
-    }
-    else if (FacetsTest[3] == 0)
-    {
-      // The origin projection P faces the facet ABC
-      s.vrtx.row(0) = s.vrtx.row(1);
-      s.vrtx.row(1) = s.vrtx.row(2);
-      s.vrtx.row(2) = s.vrtx.row(3);
-      S2D(s);
-    }
-    return;
-  }
-
-  // The origin projection P faces the facet BCD
-  s.nvrtx = 3;
-  S2D(s);
+  s = sBest;
 }
 //-------------------------------------------------------
 void support(
