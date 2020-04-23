@@ -379,11 +379,9 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
            const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd2,
            Simplex& s)
 {
-  int mk = 50;            // Maximum number of iterations of the GJK algorithm
-  double eps_rel = 1e-15; // Tolerance on relative distance
-  double eps_tot = 1e-15; // Tolerance on absolute distance
-
-  double eps_rel2 = eps_rel * eps_rel;
+  int mk = 50;             // Maximum number of iterations of the GJK algorithm
+  double eps_rel2 = 1e-25; // Tolerance on relative distance
+  double eps_tot2 = 1e-25; // Tolerance on absolute distance
 
   // Initialise
   s.nvrtx = 1;
@@ -393,7 +391,8 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
   s.vrtx.row(0) = v;
 
   // Begin GJK iteration
-  for (int k = 0; k < mk; ++k)
+  int k;
+  for (k = 0; k < mk; ++k)
   {
     // Support function
     support(bd1s, bd1, -v);
@@ -401,14 +400,18 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
 
     const double vnorm2 = v.squaredNorm();
     Eigen::Vector3d w = bd1s - bd2s;
+    std::cout << (vnorm2 - v.dot(w)) << "\n";
     // 1st exit condition
-    if ((vnorm2 - v.dot(w)) <= eps_rel2 * vnorm2)
+    if (vnorm2 - v.dot(w) < eps_rel2)
       break;
 
     // 2nd exit condition
     if (vnorm2 < eps_rel2)
       break;
 
+    // Simplex size should be less than 4, or should have exited already
+    if (s.nvrtx == 4)
+      throw std::runtime_error("OpenGJK error: simplex limit reached");
     // Add new vertex to simplex
     s.vrtx.row(s.nvrtx) = w;
     ++s.nvrtx;
@@ -422,13 +425,10 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
     double norm2Wmax = nmax.head(s.nvrtx).maxCoeff();
     // for (int i = 0; i < s.nvrtx; ++i)
     //   norm2Wmax = std::max(norm2Wmax, s.vrtx.row(i).squaredNorm());
-    if (v.squaredNorm() <= (eps_tot * eps_tot * norm2Wmax))
-      break;
-
-    // 4th exit conditions
-    if (s.nvrtx == 4)
+    if (v.squaredNorm() <= eps_tot2 * norm2Wmax)
       break;
   }
+  std::cout << "OpenGJK iterations = " << k << "\n";
 
   // Compute and return distance
   return v.norm();
