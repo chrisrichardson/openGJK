@@ -380,7 +380,7 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
            Simplex& s)
 {
   int mk = 50;            // Maximum number of iterations of the GJK algorithm
-  double eps_rel = 1e-9;  // Tolerance on relative distance
+  double eps_rel = 1e-14; // Tolerance on relative distance
   double eps_tot = 1e-15; // Tolerance on absolute distance
 
   double eps_rel2 = eps_rel * eps_rel;
