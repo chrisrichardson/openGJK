@@ -17,7 +17,7 @@ jobs:
     - name: test
       run: cd lib/src && python3 -m pytest -s -v test.py && python3 -m pytest -s -v test_dolfinx.py
     - name: coverage
-      run: cd lib/src/gcov && source gcov.sh
+      run: cd lib/src/gcov && . gcov.sh
     - name: upload coverage result
       uses: actions/upload-artifact@v1
       with:
