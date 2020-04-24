@@ -35,24 +35,14 @@
 class Simplex
 {
 public:
-  /// Return a vector based on current coordinates and lambdas
-  Eigen::Vector3d vec() const
-  {
-    Eigen::Vector3d vv;
-    vv.setZero();
-    for (int i = 0; i < nvrtx; ++i)
-      vv += lambdas[i] * vrtx.row(i);
-    return vv;
-  }
-
   /// Number of active vertices (1=point, 2=line, 3=triangle, 4=tetrahedron)
   int nvrtx;
 
   /// Vertex coordinates
   Eigen::Matrix<double, 4, 3, Eigen::RowMajor> vrtx;
 
-  /// Barycentric coordinates
-  Eigen::Vector4d lambdas;
+  /// Vector
+  Eigen::Vector3d vec;
 };
 
 /// @brief Finds point of minimum norm of 1-simplex. Robust, but slower,
@@ -63,22 +53,23 @@ void S1D(Simplex& s)
   const Eigen::Vector3d t = s.vrtx.row(0) - s.vrtx.row(1);
 
   // Project origin onto the 1D simplex - line
-  double pt = s.vrtx.row(0).dot(t) / t.squaredNorm();
+  const double pt = s.vrtx.row(0).dot(t) / t.squaredNorm();
 
   if (pt >= 0.0 and pt <= 1.0)
   {
     // The origin is between A and B
-    s.lambdas[0] = 1.0 - pt;
-    s.lambdas[1] = pt;
+    s.vec = s.vrtx.row(0);
+    s.vec -= pt * t;
     s.nvrtx = 2;
     return;
   }
 
-  s.lambdas[0] = 1.0;
   s.nvrtx = 1;
   // The origin is beyond A, change point
   if (pt > 1.0)
     s.vrtx.row(0) = s.vrtx.row(1);
+
+  s.vec = s.vrtx.row(0);
 }
 
 /// @brief Finds point of minimum norm of 2-simplex. Robust, but slower,
@@ -122,10 +113,8 @@ void S2D(Simplex& s)
   if ((FacetsTest[0] + FacetsTest[1] + FacetsTest[2]) == 3)
   {
     // The origin projections lays onto the triangle
-    const double inv_detM = 1 / nu_max;
-    s.lambdas[0] = B[2] * inv_detM;
-    s.lambdas[1] = B[1] * inv_detM;
-    s.lambdas[2] = 1.0 - s.lambdas[0] - s.lambdas[1];
+    s.vec = s.vrtx.row(0) * B[2] + s.vrtx.row(1) * B[1] + s.vrtx.row(2) * B[0];
+    s.vec /= nu_max;
     s.nvrtx = 3;
     return;
   }
@@ -142,7 +131,7 @@ void S2D(Simplex& s)
     s.vrtx.row(1) = s.vrtx.row(2);
     S1D(s);
 
-    if (sTmp.vec().squaredNorm() < s.vec().squaredNorm())
+    if (sTmp.vec.squaredNorm() < s.vec.squaredNorm())
       s = sTmp;
     return;
   }
@@ -223,11 +212,9 @@ void S3D(Simplex& s)
   if (FacetsTest[0] + FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 4)
   {
     // All signs are equal, therefore the origin is inside the simplex
-    const double inv_detM = 1 / detM;
-    s.lambdas[3] = B[0] * inv_detM;
-    s.lambdas[2] = B[1] * inv_detM;
-    s.lambdas[1] = B[2] * inv_detM;
-    s.lambdas[0] = 1 - s.lambdas[1] - s.lambdas[2] - s.lambdas[3];
+    s.vec = s.vrtx.row(0) * B[3] + s.vrtx.row(1) * B[2] + s.vrtx.row(2) * B[1]
+            + s.vrtx.row(3) * B[0];
+    s.vec /= detM;
     s.nvrtx = 4;
     return;
   }
@@ -253,7 +240,7 @@ void S3D(Simplex& s)
       sTmp.vrtx.row(1) = s.vrtx.row(facets[i][1]);
       sTmp.vrtx.row(2) = s.vrtx.row(facets[i][2]);
       S2D(sTmp);
-      double vnorm = sTmp.vec().squaredNorm();
+      double vnorm = sTmp.vec.squaredNorm();
       if (vnorm < vmin)
       {
         vmin = vnorm;
@@ -334,18 +321,10 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
     // Invoke distance sub-algorithm
     subalgorithm(s);
     vlast = v;
-    v = s.vec();
+    v = s.vec;
     // Exit condition if no change in v
     if ((vlast - v).squaredNorm() < 1e-30)
       break;
-
-    // 3rd exit condition
-    // const Eigen::Vector4d nmax = s.vrtx.rowwise().squaredNorm();
-    // double norm2Wmax = nmax.head(s.nvrtx).maxCoeff();
-    // for (int i = 0; i < s.nvrtx; ++i)
-    //   norm2Wmax = std::max(norm2Wmax, s.vrtx.row(i).squaredNorm());
-    // if (v.squaredNorm() <= eps_tot2 * norm2Wmax)
-    //  break;
   }
   if (k == mk)
     throw std::runtime_error("Max iteration limit reached");
