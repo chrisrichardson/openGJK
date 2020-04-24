@@ -21,8 +21,4 @@ jobs:
         ln -s lib/src/CMakeFiles/opengjk.dir/openGJK.cpp.gcno openGJK.gcno
         ln -s lib/src/CMakeFiles/opengjk.dir/openGJK.cpp.gcda openGJK.gcda
         gcov openGJK.cpp
-    - name: upload coverage result
-      uses: actions/upload-artifact@v1
-      with:
-        name: coverage
-        path: openGJK.cpp.gcov
+        cat openGJK.cpp.gcov
