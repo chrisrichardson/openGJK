@@ -26,6 +26,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
 
 #include "openGJK.hpp"
+#include <Eigen/Geometry>
 #include <iostream>
 
 namespace
@@ -249,17 +250,17 @@ void support(
 } // namespace
 //-----------------------------------------------------
 double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
-           const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd2,
-           Simplex& s)
+           const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd2)
 {
   int mk = 50;             // Maximum number of iterations of the GJK algorithm
   double eps_rel2 = 1e-25; // Tolerance on relative distance
 
   // Initialise
-  s.nvrtx = 1;
   Eigen::Vector3d bd1s = bd1.row(0);
   Eigen::Vector3d bd2s = bd2.row(0);
   Eigen::Vector3d v = bd1s - bd2s;
+  Simplex s;
+  s.nvrtx = 1;
   s.vrtx.row(0) = v;
 
   // Begin GJK iteration
@@ -309,7 +310,9 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
   if (k == mk)
     throw std::runtime_error("Max iteration limit reached");
 
+#ifdef DEBUG
   std::cout << "OpenGJK iterations = " << k << "\n";
+#endif
 
   // Compute and return distance
   return v.norm();

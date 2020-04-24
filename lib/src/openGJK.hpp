@@ -2,7 +2,6 @@
 #pragma once
 
 #include <Eigen/Dense>
-#include <Eigen/Geometry>
 
 ///
 /// @brief Structure for a simplex.
@@ -19,6 +18,10 @@ using Simplex = struct Simplex
   Eigen::Vector3d vec;
 };
 
-double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
-           const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd2,
-           Simplex& s);
+/// Calculate the distance between two convex bodies bd1 and bd2
+/// @param[in] bd1 Body 1 list of vertices
+/// @param[in] bd2 Body 2 list of vertices
+/// @return distance between bodies
+double
+gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
+    const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd2);
