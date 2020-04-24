@@ -262,8 +262,6 @@ void support(
     bs = body.row(i);
 }
 //-----------------------------------------------------
-void subalgorithm(Simplex& s) {}
-//-------------------------------------------------------------
 double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
            const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd2,
            Simplex& s)
@@ -338,8 +336,8 @@ namespace py = pybind11;
 PYBIND11_MODULE(opengjk, m)
 {
   m.def("gjk",
-        [](Eigen::Array<double, Eigen::Dynamic, 3, Eigen::RowMajor> arr1,
-           Eigen::Array<double, Eigen::Dynamic, 3, Eigen::RowMajor> arr2)
+        [](const Eigen::Array<double, Eigen::Dynamic, 3, Eigen::RowMajor>& arr1,
+           const Eigen::Array<double, Eigen::Dynamic, 3, Eigen::RowMajor>& arr2)
             -> double {
           Simplex s;
           return gjk(arr1, arr2, s);
