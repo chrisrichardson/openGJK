@@ -13,5 +13,5 @@ jobs:
     - name: cmake
       run: cd lib/src && cmake .
     - name: make
-      run: cd lib/src && make
+      run: export CPATH=/usr/include/eigen3 && cd lib/src && make
       
