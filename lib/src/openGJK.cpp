@@ -171,7 +171,7 @@ void S2D(Simplex& s)
   s.nvrtx = 2;
   S1D(s);
 }
-//-------------------------------------------------------
+
 /// @brief Finds point of minimum norm of 3-simplex. Robust, but slower,
 /// version of algorithm presented in paper.
 void S3D(Simplex& s)
@@ -190,27 +190,27 @@ void S3D(Simplex& s)
   double detM = B.sum();
 
   // Test if sign of ABCD is equal to the signs of the auxiliary simplices
-  double eps = 1e-13;
+  double eps = 1e-15;
   int FacetsTest[4] = {1, 1, 1, 1};
   if (std::abs(detM) < eps)
   {
     Eigen::Vector4d Babs = B.cwiseAbs();
     if (Babs[2] < eps and Babs[3] < eps)
-      FacetsTest[1] = 0; /* A = B. Test only ACD */
+      FacetsTest[1] = 0; // A = B. Test only ACD
     else if (Babs[1] < eps and Babs[3] < eps)
-      FacetsTest[2] = 0; /* A = C. Test only ABD */
+      FacetsTest[2] = 0; // A = C. Test only ABD
     else if (Babs[1] < eps and Babs[2] < eps)
-      FacetsTest[3] = 0; /* A = D. Test only ABC */
+      FacetsTest[3] = 0; // A = D. Test only ABC
     else if (Babs[0] < eps and Babs[3] < eps)
-      FacetsTest[1] = 0; /* B = C. Test only ACD */
+      FacetsTest[1] = 0; // B = C. Test only ACD
     else if (Babs[0] < eps and Babs[2] < eps)
-      FacetsTest[1] = 0; /* B = D. Test only ABD */
+      FacetsTest[1] = 0; // B = D. Test only ABD
     else if (Babs[0] < eps and Babs[1] < eps)
-      FacetsTest[2] = 0; /* C = D. Test only ABC */
+      FacetsTest[2] = 0; // C = D. Test only ABC
     else
     {
       for (int i = 0; i < 4; i++)
-        FacetsTest[i] = 0; /* Any other case. Test ABC, ABD, ACD */
+        FacetsTest[i] = 0; // Any other case. Test ABC, ABD, ACD
     }
   }
   else
@@ -347,6 +347,9 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
     // if (v.squaredNorm() <= eps_tot2 * norm2Wmax)
     //  break;
   }
+  if (k == mk)
+    throw std::runtime_error("Max iteration limit reached");
+
   std::cout << "OpenGJK iterations = " << k << "\n";
 
   // Compute and return distance
