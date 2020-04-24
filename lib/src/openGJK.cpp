@@ -151,15 +151,14 @@ void S3D(Simplex& s)
 {
   assert(s.nvrtx == 4);
 
-  Eigen::Matrix3d M = s.vrtx.bottomRows(3);
   Eigen::Vector4d B;
-  B[3] = -M.determinant();
-  M.row(0) = s.vrtx.row(0);
-  B[2] = M.determinant();
-  M.row(1) = s.vrtx.row(1);
-  B[1] = -M.determinant();
-  M.row(2) = s.vrtx.row(2);
-  B[0] = M.determinant();
+  const Eigen::Vector3d W1 = s.vrtx.row(0).cross(s.vrtx.row(1)).transpose();
+  const Eigen::Vector3d W2 = s.vrtx.row(2).cross(s.vrtx.row(3)).transpose();
+  B[0] = s.vrtx.row(2) * W1;
+  B[1] = -s.vrtx.row(3) * W1;
+  B[2] = s.vrtx.row(0) * W2;
+  B[3] = -s.vrtx.row(1) * W2;
+
   double detM = B.sum();
 
   // Test if sign of ABCD is equal to the signs of the auxiliary simplices
