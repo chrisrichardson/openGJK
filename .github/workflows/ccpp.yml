@@ -15,5 +15,5 @@ jobs:
     - name: make
       run: export CPATH=/usr/include/eigen3 && cd lib/src && make
     - name: test
-      run: cd lib/src && python3 -m pytest -s -v test.py
+      run: cd lib/src && python3 -m pytest -s -v test.py && python3 -m pytest -s -v test_dolfinx.py
       
