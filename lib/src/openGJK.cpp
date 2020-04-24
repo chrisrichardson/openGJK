@@ -262,21 +262,7 @@ void support(
     bs = body.row(i);
 }
 //-----------------------------------------------------
-void subalgorithm(Simplex& s)
-{
-  switch (s.nvrtx)
-  {
-  case 4:
-    S3D(s);
-    break;
-  case 3:
-    S2D(s);
-    break;
-  case 2:
-    S1D(s);
-    break;
-  }
-}
+void subalgorithm(Simplex& s) {}
 //-------------------------------------------------------------
 double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
            const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd2,
@@ -292,7 +278,6 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
   Eigen::Vector3d v = bd1s - bd2s;
   s.vrtx.row(0) = v;
 
-  Eigen::Vector3d vlast;
   // Begin GJK iteration
   int k;
   for (k = 0; k < mk; ++k)
@@ -319,12 +304,23 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
     ++s.nvrtx;
 
     // Invoke distance sub-algorithm
-    subalgorithm(s);
-    vlast = v;
-    v = s.vec;
-    // Exit condition if no change in v
-    if ((vlast - v).squaredNorm() < 1e-30)
+    switch (s.nvrtx)
+    {
+    case 4:
+      S3D(s);
       break;
+    case 3:
+      S2D(s);
+      break;
+    case 2:
+      S1D(s);
+      break;
+    }
+
+    // Exit condition if no change in v
+    if ((s.vec - v).squaredNorm() < 1e-30)
+      break;
+    v = s.vec;
   }
   if (k == mk)
     throw std::runtime_error("Max iteration limit reached");
