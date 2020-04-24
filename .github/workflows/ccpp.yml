@@ -17,9 +17,12 @@ jobs:
     - name: test
       run: cd lib/src && python3 -m pytest -s -v test.py && python3 -m pytest -s -v test_dolfinx.py
     - name: coverage
-      run: cd lib/src/gcov && . gcov.sh
+      run: |
+        ln -s lib/src/CMakeFiles/opengjk.dir/openGJK.cpp.gcno openGJK.gcno
+        ln -s lib/src/CMakeFiles/opengjk.dir/openGJK.cpp.gcda openGJK.gcda
+        gcov openGJK.cpp
     - name: upload coverage result
       uses: actions/upload-artifact@v1
       with:
         name: coverage
-        path: lib/src/gcov/openGJK.cpp.gcov
+        path: openGJK.cpp.gcov
