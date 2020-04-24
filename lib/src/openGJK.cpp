@@ -44,9 +44,7 @@ void S1D(Simplex& s)
   if (pt >= 0.0 and pt <= 1.0)
   {
     // The origin is between A and B
-    s.vec = s.vrtx.row(0);
-    s.vec -= pt * t;
-    s.nvrtx = 2;
+    s.vec = s.vrtx.row(0).transpose() - pt * t;
     return;
   }
 
@@ -69,7 +67,7 @@ void S2D(Simplex& s)
 
   // Find best axis for projection
   Eigen::Vector3d n = a.cross(b) + b.cross(c) + c.cross(a);
-  Eigen::Vector3d nu_fabs = n.cwiseAbs();
+  const Eigen::Vector3d nu_fabs = n.cwiseAbs();
   int indexI;
   nu_fabs.maxCoeff(&indexI);
   const double nu_max = n[indexI];
@@ -165,7 +163,7 @@ void S3D(Simplex& s)
   double detM = B.sum();
 
   // Test if sign of ABCD is equal to the signs of the auxiliary simplices
-  double eps = 1e-15;
+  const double eps = 1e-15;
   int FacetsTest[4] = {1, 1, 1, 1};
   if (std::abs(detM) < eps)
   {
@@ -226,7 +224,7 @@ void S3D(Simplex& s)
       sTmp.vrtx.row(1) = s.vrtx.row(facets[i][1]);
       sTmp.vrtx.row(2) = s.vrtx.row(facets[i][2]);
       S2D(sTmp);
-      double vnorm = sTmp.vec.squaredNorm();
+      const double vnorm = sTmp.vec.squaredNorm();
       if (vnorm < vmin)
       {
         vmin = vnorm;
@@ -243,7 +241,7 @@ void support(
     const Eigen::Vector3d& v)
 {
   Eigen::VectorXd::Index i;
-  double maxs = (body * v).maxCoeff(&i);
+  const double maxs = (body * v).maxCoeff(&i);
   if (maxs > bs.dot(v))
     bs = body.row(i);
 }
@@ -252,8 +250,8 @@ void support(
 double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
            const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd2)
 {
-  int mk = 50;             // Maximum number of iterations of the GJK algorithm
-  double eps_rel2 = 1e-25; // Tolerance on relative distance
+  const int mk = 50; // Maximum number of iterations of the GJK algorithm
+  const double eps_rel2 = 1e-25; // Tolerance on relative distance
 
   // Initialise
   Eigen::Vector3d bd1s = bd1.row(0);
@@ -272,7 +270,7 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
     support(bd2s, bd2, v);
 
     const double vnorm2 = v.squaredNorm();
-    Eigen::Vector3d w = bd1s - bd2s;
+    const Eigen::Vector3d w = bd1s - bd2s;
     // 1st exit condition
     if (vnorm2 - v.dot(w) < eps_rel2)
       break;
