@@ -25,26 +25,11 @@
  *                                                                        *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
 
-#include <Eigen/Dense>
-#include <Eigen/Geometry>
+#include "openGJK.hpp"
 #include <iostream>
 
-///
-/// @brief Structure for a simplex.
-///
-class Simplex
+namespace
 {
-public:
-  /// Number of active vertices (1=point, 2=line, 3=triangle, 4=tetrahedron)
-  int nvrtx;
-
-  /// Vertex coordinates
-  Eigen::Matrix<double, 4, 3, Eigen::RowMajor> vrtx;
-
-  /// Vector
-  Eigen::Vector3d vec;
-};
-
 /// @brief Finds point of minimum norm of 1-simplex. Robust, but slower,
 /// version of algorithm presented in paper.
 void S1D(Simplex& s)
@@ -261,6 +246,7 @@ void support(
   if (maxs > bs.dot(v))
     bs = body.row(i);
 }
+} // namespace
 //-----------------------------------------------------
 double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
            const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd2,
@@ -327,19 +313,4 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
 
   // Compute and return distance
   return v.norm();
-}
-
-#include <pybind11/eigen.h>
-#include <pybind11/pybind11.h>
-namespace py = pybind11;
-
-PYBIND11_MODULE(opengjk, m)
-{
-  m.def("gjk",
-        [](const Eigen::Array<double, Eigen::Dynamic, 3, Eigen::RowMajor>& arr1,
-           const Eigen::Array<double, Eigen::Dynamic, 3, Eigen::RowMajor>& arr2)
-            -> double {
-          Simplex s;
-          return gjk(arr1, arr2, s);
-        });
 }

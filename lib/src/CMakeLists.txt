@@ -7,4 +7,4 @@ project(opengjk)
 SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
 
 find_package(pybind11)
-pybind11_add_module(opengjk NO_EXTRAS openGJK.cpp)
+pybind11_add_module(opengjk NO_EXTRAS openGJK.cpp pyOpenGJK.cpp)
