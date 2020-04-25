@@ -38,21 +38,25 @@ void S1D(Simplex& s)
   assert(s.nvrtx == 2);
   const Eigen::Vector3d t = s.vrtx.row(0) - s.vrtx.row(1);
 
-  // Project origin onto the 1D simplex - line
-  const double pt = s.vrtx.row(0).dot(t) / t.squaredNorm();
-
-  if (pt >= 0.0 and pt <= 1.0)
+  const double tnorm2 = t.squaredNorm();
+  if (tnorm2 > 0.0)
   {
-    // The origin is between A and B
-    s.vec = s.vrtx.row(0).transpose() - pt * t;
-    return;
+    // Project origin onto the 1D simplex - line
+    const double pt = s.vrtx.row(0).dot(t) / tnorm2;
+
+    if (pt >= 0.0 and pt <= 1.0)
+    {
+      // The origin is between A and B
+      s.vec = s.vrtx.row(0).transpose() - pt * t;
+      return;
+    }
+
+    // The origin is beyond A, change point
+    if (pt > 1.0)
+      s.vrtx.row(0) = s.vrtx.row(1);
   }
 
   s.nvrtx = 1;
-  // The origin is beyond A, change point
-  if (pt > 1.0)
-    s.vrtx.row(0) = s.vrtx.row(1);
-
   s.vec = s.vrtx.row(0);
 }
 
@@ -61,38 +65,45 @@ void S1D(Simplex& s)
 void S2D(Simplex& s)
 {
   assert(s.nvrtx == 3);
-  const Eigen::Vector3d c = s.vrtx.row(0);
-  const Eigen::Vector3d b = s.vrtx.row(1);
+  const Eigen::Vector3d ac = s.vrtx.row(0) - s.vrtx.row(2);
+  const Eigen::Vector3d ab = s.vrtx.row(1) - s.vrtx.row(2);
   const Eigen::Vector3d a = s.vrtx.row(2);
 
   // Find best axis for projection
-  Eigen::Vector3d n = a.cross(b) + b.cross(c) + c.cross(a);
+  Eigen::Vector3d n = ab.cross(ac);
   const Eigen::Vector3d nu_fabs = n.cwiseAbs();
   int indexI;
   nu_fabs.maxCoeff(&indexI);
   const double nu_max = n[indexI];
-  const int indexJ0 = (indexI + 1) % 3;
-  const int indexJ1 = (indexI + 2) % 3;
-  n.normalize();
-  const double dotNA = n.dot(a);
 
   Eigen::Vector3d B;
-  Eigen::Matrix3d M;
-  M.row(0) << s.vrtx(2, indexJ0), s.vrtx(2, indexJ1), 1.0;
-  M.row(1) << s.vrtx(1, indexJ0), s.vrtx(1, indexJ1), 1.0;
-  M.row(2) << dotNA * n[indexJ0], dotNA * n[indexJ1], 1.0;
-  B[2] = M.determinant();
-  M(1, 0) = s.vrtx(0, indexJ0);
-  M(1, 1) = s.vrtx(0, indexJ1);
-  B[1] = -M.determinant();
-  M(0, 0) = s.vrtx(1, indexJ0);
-  M(0, 1) = s.vrtx(1, indexJ1);
-  B[0] = M.determinant();
+  int FacetsTest[3] = {1, 1, 1};
 
-  // Test if sign of ABC is equal to the signs of the auxiliary simplices
-  int FacetsTest[3];
-  for (int i = 0; i < 3; ++i)
-    FacetsTest[i] = (std::signbit(nu_max) == std::signbit(B[i]));
+  if (nu_max == 0.0)
+  {
+    if (ac.squaredNorm() == 0.0)
+      FacetsTest[2] = 0;
+    else
+      FacetsTest[1] = 0;
+  }
+  else
+  {
+    n.normalize();
+    const double dotNA = n.dot(a);
+    const int indexJ0 = (indexI + 1) % 3;
+    const int indexJ1 = (indexI + 2) % 3;
+    const Eigen::Vector3d W1 = s.vrtx.col(indexJ0).head(3).reverse();
+    const Eigen::Vector3d W2 = s.vrtx.col(indexJ1).head(3).reverse();
+    const Eigen::Vector3d W3 = (W1 * n[indexJ1] - W2 * n[indexJ0]) * dotNA;
+    B = W1.cross(W2);
+    B[0] += (W3[2] - W3[1]);
+    B[1] += (W3[0] - W3[2]);
+    B[2] += (W3[1] - W3[0]);
+
+    // Test if sign of ABC is equal to the signs of the auxiliary simplices
+    for (int i = 0; i < 3; ++i)
+      FacetsTest[i] = (std::signbit(nu_max) == std::signbit(B[i]));
+  }
 
   if ((FacetsTest[0] + FacetsTest[1] + FacetsTest[2]) == 3)
   {
