@@ -4,7 +4,7 @@
 cmake_minimum_required(VERSION 2.8.12)
 project(opengjk)
 
-SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
+SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall --coverage")
 
 find_package(pybind11)
 pybind11_add_module(opengjk NO_EXTRAS openGJK.cpp pyOpenGJK.cpp)

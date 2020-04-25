@@ -28,6 +28,7 @@
 #include "openGJK.hpp"
 #include <Eigen/Geometry>
 #include <iostream>
+#include <stdexcept>
 
 namespace
 {
@@ -244,17 +245,6 @@ void S3D(Simplex& s)
   }
   s = sBest;
 }
-//-------------------------------------------------------
-void support(
-    Eigen::Vector3d& bs,
-    const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& body,
-    const Eigen::Vector3d& v)
-{
-  Eigen::VectorXd::Index i;
-  const double maxs = (body * v).maxCoeff(&i);
-  if (maxs > bs.dot(v))
-    bs = body.row(i);
-}
 } // namespace
 //-----------------------------------------------------
 double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
@@ -264,9 +254,7 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
   const double eps_rel2 = 1e-25; // Tolerance on relative distance
 
   // Initialise
-  Eigen::Vector3d bd1s = bd1.row(0);
-  Eigen::Vector3d bd2s = bd2.row(0);
-  Eigen::Vector3d v = bd1s - bd2s;
+  Eigen::Vector3d v = bd1.row(0) - bd2.row(0);
   Simplex s;
   s.nvrtx = 1;
   s.vrtx.row(0) = v;
@@ -276,12 +264,13 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
   for (k = 0; k < mk; ++k)
   {
     // Support function
-    support(bd1s, bd1, -v);
-    support(bd2s, bd2, v);
+    Eigen::VectorXd::Index i, j;
+    (bd1 * -v).maxCoeff(&i);
+    (bd2 * v).maxCoeff(&j);
+    const Eigen::Vector3d w = bd1.row(i) - bd2.row(j);
 
-    const double vnorm2 = v.squaredNorm();
-    const Eigen::Vector3d w = bd1s - bd2s;
     // 1st exit condition
+    const double vnorm2 = v.squaredNorm();
     if (vnorm2 - v.dot(w) < eps_rel2)
       break;
 
@@ -316,7 +305,7 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
     v = s.vec;
   }
   if (k == mk)
-    throw std::runtime_error("Max iteration limit reached");
+    throw std::runtime_error("OpenGJK error: max iteration limit reached");
 
 #ifdef DEBUG
   std::cout << "OpenGJK iterations = " << k << "\n";

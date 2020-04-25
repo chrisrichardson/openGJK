@@ -138,3 +138,27 @@ def test_hex_collision_3d(delta):
         print("Computed distance ", distance,
               "Actual distance ", actual_distance)
         assert(np.isclose(distance, actual_distance, atol=1e-15))
+
+
+@pytest.mark.parametrize("c0", [0, 1, 2, 3])
+@pytest.mark.parametrize("c1", [0, 1, 2, 3])
+def test_cube_distance(c0, c1):
+    cubes = [np.array([[-1, -1, -1], [1, -1, -1], [-1, 1, -1], [1, 1, -1],
+                       [-1, -1, 1], [1, -1, 1], [-1, 1, 1], [1, 1, 1]],
+                      dtype=np.float64)]
+
+    r = R.from_euler('z', 45, degrees=True)
+    cubes.append(r.apply(cubes[0]))
+    r = R.from_euler('y', np.arctan2(1.0, np.sqrt(2)))
+    cubes.append(r.apply(cubes[1]))
+    r = R.from_euler('y', 45, degrees=True)
+    cubes.append(r.apply(cubes[0]))
+
+    dx = cubes[c0][:,0].max() - cubes[c1][:,0].min()
+    cube0 = cubes[c0]
+
+    for delta in [1.0, 1e-4, 1e-8, 1e-12]:
+        cube1 = cubes[c1] + np.array([dx + delta, 0, 0])
+        distance = opengjk.gjk(cube0, cube1)
+        assert(np.isclose(distance, delta))
+
