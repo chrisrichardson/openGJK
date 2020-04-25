@@ -90,12 +90,11 @@ void S2D(Simplex& s)
   else
   {
     n.normalize();
-    const double dotNA = n.dot(a);
     const int indexJ0 = (indexI + 1) % 3;
     const int indexJ1 = (indexI + 2) % 3;
     const Eigen::Vector3d W1 = s.vrtx.col(indexJ0).head(3).reverse();
     const Eigen::Vector3d W2 = s.vrtx.col(indexJ1).head(3).reverse();
-    const Eigen::Vector3d W3 = (W1 * n[indexJ1] - W2 * n[indexJ0]) * dotNA;
+    const Eigen::Vector3d W3 = (W1 * n[indexJ1] - W2 * n[indexJ0]) * n.dot(a);
     B = W1.cross(W2);
     B[0] += (W3[2] - W3[1]);
     B[1] += (W3[0] - W3[2]);
@@ -164,8 +163,8 @@ void S3D(Simplex& s)
   assert(s.nvrtx == 4);
 
   Eigen::Vector4d B;
-  const Eigen::Vector3d W1 = s.vrtx.row(0).cross(s.vrtx.row(1)).transpose();
-  const Eigen::Vector3d W2 = s.vrtx.row(2).cross(s.vrtx.row(3)).transpose();
+  const Eigen::Vector3d W1 = s.vrtx.row(0).cross(s.vrtx.row(1));
+  const Eigen::Vector3d W2 = s.vrtx.row(2).cross(s.vrtx.row(3));
   B[0] = s.vrtx.row(2) * W1;
   B[1] = -s.vrtx.row(3) * W1;
   B[2] = s.vrtx.row(0) * W2;
