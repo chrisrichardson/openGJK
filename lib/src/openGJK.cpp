@@ -67,11 +67,11 @@ void S2D(Simplex& s)
 {
   assert(s.nvrtx == 3);
   const Eigen::Vector3d ac = s.vrtx.row(0) - s.vrtx.row(2);
-  const Eigen::Vector3d cb = s.vrtx.row(1) - s.vrtx.row(0);
+  const Eigen::Vector3d bc = s.vrtx.row(0) - s.vrtx.row(1);
   const Eigen::Vector3d a = s.vrtx.row(2);
 
   // Find best axis for projection
-  Eigen::Vector3d n = cb.cross(ac);
+  Eigen::Vector3d n = ac.cross(bc);
   const Eigen::Vector3d nu_fabs = n.cwiseAbs();
   int indexI;
   nu_fabs.maxCoeff(&indexI);
