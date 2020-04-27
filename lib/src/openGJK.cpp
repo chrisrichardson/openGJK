@@ -67,11 +67,11 @@ void S2D(Simplex& s)
 {
   assert(s.nvrtx == 3);
   const Eigen::Vector3d ac = s.vrtx.row(0) - s.vrtx.row(2);
-  const Eigen::Vector3d ab = s.vrtx.row(1) - s.vrtx.row(2);
+  const Eigen::Vector3d cb = s.vrtx.row(1) - s.vrtx.row(0);
   const Eigen::Vector3d a = s.vrtx.row(2);
 
   // Find best axis for projection
-  Eigen::Vector3d n = ab.cross(ac);
+  Eigen::Vector3d n = cb.cross(ac);
   const Eigen::Vector3d nu_fabs = n.cwiseAbs();
   int indexI;
   nu_fabs.maxCoeff(&indexI);
@@ -222,13 +222,14 @@ void S3D(Simplex& s)
   }
 
   // Either 1, 2 or 3 of ACD, ABD or ABC are closest.
-  Simplex sTmp, sBest;
+  Simplex sBest;
   static const int facets[3][3] = {{0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
   double vmin = std::numeric_limits<double>::max();
   for (int i = 0; i < 3; ++i)
   {
     if (FacetsTest[i + 1] == 0)
     {
+      Simplex sTmp;
       sTmp.nvrtx = 3;
       sTmp.vrtx.row(0) = s.vrtx.row(facets[i][0]);
       sTmp.vrtx.row(1) = s.vrtx.row(facets[i][1]);

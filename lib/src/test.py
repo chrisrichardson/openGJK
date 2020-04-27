@@ -162,3 +162,10 @@ def test_cube_distance(c0, c1):
         distance = opengjk.gjk(cube0, cube1)
         assert(np.isclose(distance, delta))
 
+def test_random_objects():
+    for i in range(1, 8):
+        for j in range(1, 8):
+            for k in range(1000):    
+                arr1 = np.random.rand(i, 3)
+                arr2 = np.random.rand(j, 3)
+                opengjk.gjk(arr1, arr2) 

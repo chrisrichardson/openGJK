@@ -2,7 +2,7 @@
     "clang_format_style set": "file",
     "editor.formatOnSave": true,
     "editor.defaultFormatter": "xaver.clang-format",
-    "clang-format.executable": "clang-format-9",
+    "clang-format.executable": "clang-format-10",
     "python.formatting.provider": "autopep8",
     "python.linting.pylintEnabled": false,
     "cornflakes.linter.executablePath": "/usr/local/bin/flake8",
