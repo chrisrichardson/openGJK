@@ -107,8 +107,8 @@ void S2D(Simplex& s)
 
   if ((FacetsTest[0] + FacetsTest[1] + FacetsTest[2]) == 3)
   {
-    // The origin projections lays onto the triangle
-    s.vec = s.vrtx.row(0) * B[2] + s.vrtx.row(1) * B[1] + s.vrtx.row(2) * B[0];
+    // The origin projection lays onto the triangle
+    s.vec = s.vrtx.topRows(3).transpose() * B.reverse();
     s.vec /= nu_max;
     s.nvrtx = 3;
     return;
@@ -187,9 +187,9 @@ void S3D(Simplex& s)
     else if (Babs[0] < eps and Babs[3] < eps)
       FacetsTest[1] = 0; // B = C. Test only ACD
     else if (Babs[0] < eps and Babs[2] < eps)
-      FacetsTest[1] = 0; // B = D. Test only ABD
+      FacetsTest[1] = 0; // B = D. Test only ACD
     else if (Babs[0] < eps and Babs[1] < eps)
-      FacetsTest[2] = 0; // C = D. Test only ABC
+      FacetsTest[2] = 0; // C = D. Test only ABD
     else
     {
       for (int i = 0; i < 4; i++)
@@ -206,8 +206,7 @@ void S3D(Simplex& s)
   if (FacetsTest[0] + FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 4)
   {
     // All signs are equal, therefore the origin is inside the simplex
-    s.vec = s.vrtx.row(0) * B[3] + s.vrtx.row(1) * B[2] + s.vrtx.row(2) * B[1]
-            + s.vrtx.row(3) * B[0];
+    s.vec = s.vrtx.transpose() * B.reverse();
     s.vec /= detM;
     s.nvrtx = 4;
     return;
