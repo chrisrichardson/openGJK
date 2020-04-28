@@ -69,6 +69,7 @@ void S2D(Simplex& s)
   const Eigen::Vector3d ac = s.vrtx.row(0) - s.vrtx.row(2);
   const Eigen::Vector3d bc = s.vrtx.row(0) - s.vrtx.row(1);
   const Eigen::Vector3d a = s.vrtx.row(2);
+  const Eigen::Vector3d b = s.vrtx.row(1);
 
   // Find best axis for projection
   Eigen::Vector3d n = ac.cross(bc);
@@ -94,7 +95,8 @@ void S2D(Simplex& s)
     const int indexJ1 = (indexI + 2) % 3;
     const Eigen::Vector3d W1 = s.vrtx.col(indexJ0).head(3).reverse();
     const Eigen::Vector3d W2 = s.vrtx.col(indexJ1).head(3).reverse();
-    const Eigen::Vector3d W3 = (W1 * n[indexJ1] - W2 * n[indexJ0]) * n.dot(a);
+    const Eigen::Vector3d W3
+        = (W1 * n[indexJ1] - W2 * n[indexJ0]) * n.dot(a + b) / 2.0;
     B = W1.cross(W2);
     B[0] += (W3[2] - W3[1]);
     B[1] += (W3[0] - W3[2]);
