@@ -35,7 +35,7 @@ namespace
 {
 /// @brief Finds point of minimum norm of 1-simplex. Robust, but slower,
 /// version of algorithm presented in paper.
-void S1D(Simplex& s)
+Eigen::Vector3d S1D(Simplex& s)
 {
   assert(s.nvrtx == 2);
   const Eigen::Vector3d t = s.vrtx.row(0) - s.vrtx.row(1);
@@ -49,8 +49,7 @@ void S1D(Simplex& s)
     if (pt >= 0.0 and pt <= 1.0)
     {
       // The origin is between A and B
-      s.vec = s.vrtx.row(0).transpose() - pt * t;
-      return;
+      return s.vrtx.row(0).transpose() - pt * t;
     }
 
     // The origin is beyond A, change point
@@ -59,18 +58,17 @@ void S1D(Simplex& s)
   }
 
   s.nvrtx = 1;
-  s.vec = s.vrtx.row(0);
+  return s.vrtx.row(0);
 }
 
 /// @brief Finds point of minimum norm of 2-simplex. Robust, but slower,
 /// version of algorithm presented in paper.
-void S2D(Simplex& s)
+Eigen::Vector3d S2D(Simplex& s)
 {
   assert(s.nvrtx == 3);
   const Eigen::Vector3d ac = s.vrtx.row(0) - s.vrtx.row(2);
   const Eigen::Vector3d bc = s.vrtx.row(0) - s.vrtx.row(1);
   const Eigen::Vector3d a = s.vrtx.row(2);
-  const Eigen::Vector3d b = s.vrtx.row(1);
 
   // Find best axis for projection
   Eigen::Vector3d n = ac.cross(bc);
@@ -96,8 +94,7 @@ void S2D(Simplex& s)
     const int indexJ1 = (indexI + 2) % 3;
     const Eigen::Vector3d W1 = s.vrtx.col(indexJ0).head(3).reverse();
     const Eigen::Vector3d W2 = s.vrtx.col(indexJ1).head(3).reverse();
-    const Eigen::Vector3d W3
-        = (W1 * n[indexJ1] - W2 * n[indexJ0]) * n.dot(a + b) / 2.0;
+    const Eigen::Vector3d W3 = (W1 * n[indexJ1] - W2 * n[indexJ0]) * n.dot(a);
     B = W1.cross(W2);
     B[0] += (W3[2] - W3[1]);
     B[1] += (W3[0] - W3[2]);
@@ -111,27 +108,29 @@ void S2D(Simplex& s)
   if ((FacetsTest[0] + FacetsTest[1] + FacetsTest[2]) == 3)
   {
     // The origin projection lays onto the triangle
-    s.vec = s.vrtx.topRows(3).transpose() * B.reverse();
-    s.vec /= nu_max;
     s.nvrtx = 3;
-    return;
+    return n.dot(a) * n;
   }
 
   if (FacetsTest[1] == 0 and FacetsTest[2] == 0)
   {
+    Eigen::Vector3d v, vTmp;
     Simplex sTmp;
     sTmp.nvrtx = 2;
     sTmp.vrtx.row(0) = s.vrtx.row(1);
     sTmp.vrtx.row(1) = s.vrtx.row(2);
-    S1D(sTmp);
+    vTmp = S1D(sTmp);
 
     s.nvrtx = 2;
     s.vrtx.row(1) = s.vrtx.row(2);
-    S1D(s);
+    v = S1D(s);
 
-    if (sTmp.vec.squaredNorm() < s.vec.squaredNorm())
+    if (vTmp.squaredNorm() < v.squaredNorm())
+    {
       s = sTmp;
-    return;
+      return vTmp;
+    }
+    return v;
   }
 
   if (FacetsTest[2] == 0)
@@ -140,8 +139,7 @@ void S2D(Simplex& s)
     s.nvrtx = 2;
     s.vrtx.row(0) = s.vrtx.row(1);
     s.vrtx.row(1) = s.vrtx.row(2);
-    S1D(s);
-    return;
+    return S1D(s);
   }
 
   if (FacetsTest[1] == 0)
@@ -149,19 +147,18 @@ void S2D(Simplex& s)
     // The origin projection P faces the segment AC
     s.nvrtx = 2;
     s.vrtx.row(1) = s.vrtx.row(2);
-    S1D(s);
-    return;
+    return S1D(s);
   }
 
   // FacetsTest[0] == 0
   // The origin projection P faces the segment BC
   s.nvrtx = 2;
-  S1D(s);
+  return S1D(s);
 }
 
 /// @brief Finds point of minimum norm of 3-simplex. Robust, but slower,
 /// version of algorithm presented in paper.
-void S3D(Simplex& s)
+Eigen::Vector3d S3D(Simplex& s)
 {
   assert(s.nvrtx == 4);
 
@@ -209,23 +206,20 @@ void S3D(Simplex& s)
   if (FacetsTest[0] + FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 4)
   {
     // All signs are equal, therefore the origin is inside the simplex
-    s.vec.setZero();
-    // s.vec = s.vrtx.transpose() * B.reverse();
-    // s.vec /= detM;
     s.nvrtx = 4;
-    return;
+    return Eigen::Vector3d::Zero();
   }
 
   if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 3)
   {
     // The origin projection P faces the facet BCD
     s.nvrtx = 3;
-    S2D(s);
-    return;
+    return S2D(s);
   }
 
   // Either 1, 2 or 3 of ACD, ABD or ABC are closest.
   Simplex sBest;
+  Eigen::Vector3d vBest;
   static const int facets[3][3] = {{0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
   double vmin = std::numeric_limits<double>::max();
   for (int i = 0; i < 3; ++i)
@@ -237,24 +231,27 @@ void S3D(Simplex& s)
       sTmp.vrtx.row(0) = s.vrtx.row(facets[i][0]);
       sTmp.vrtx.row(1) = s.vrtx.row(facets[i][1]);
       sTmp.vrtx.row(2) = s.vrtx.row(facets[i][2]);
-      S2D(sTmp);
-      const double vnorm = sTmp.vec.squaredNorm();
+      Eigen::Vector3d vTmp = S2D(sTmp);
+      const double vnorm = vTmp.squaredNorm();
       if (vnorm < vmin)
       {
         vmin = vnorm;
+        vBest = vTmp;
         sBest = sTmp;
       }
     }
   }
   s = sBest;
+  return vBest;
 }
 } // namespace
 //-----------------------------------------------------
 double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
            const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd2)
 {
-  const int mk = 50; // Maximum number of iterations of the GJK algorithm
-  const double eps2 = 1e-17; // Tolerance
+  const int mk = 50;   // Maximum number of iterations of the GJK algorithm
+  double eps2 = 1e-25; // Tolerance
+  const double eps2_min = 1e-6; // Minimum tolerance when difficult to converge
 
   // Initialise
   Simplex s;
@@ -294,29 +291,28 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
     s.vrtx.row(s.nvrtx) = w;
     ++s.nvrtx;
 
-    if (k > 5)
-      std::cout << "k = " << k << " s = \n[" << s.vrtx.topRows(s.nvrtx)
-                << " vnorm2 = " << vnorm2 << ", " << (vnorm2 - v.dot(w))
-                << "\n";
-
     // Invoke distance sub-algorithm
     switch (s.nvrtx)
     {
     case 4:
-      S3D(s);
+      v = S3D(s);
       break;
     case 3:
-      S2D(s);
+      v = S2D(s);
       break;
     case 2:
-      S1D(s);
+      v = S1D(s);
       break;
     }
-    v = s.vec;
+
     vnorm2 = v.squaredNorm();
     // 2nd exit condition - intersecting or touching
     if (vnorm2 < eps2)
       break;
+
+    // Weaken condition on each iteration
+    if (k > 5 and eps2 < eps2_min)
+      eps2 *= 10;
   }
   if (k == mk)
     throw std::runtime_error("OpenGJK error: max iteration limit reached");

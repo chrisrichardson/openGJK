@@ -8,14 +8,11 @@
 ///
 using Simplex = struct Simplex
 {
-  /// Number of active vertices (1=point, 2=line, 3=triangle, 4=tetrahedron)
-  int nvrtx;
-
   /// Vertex coordinates
   Eigen::Matrix<double, 4, 3, Eigen::RowMajor> vrtx;
 
-  /// Vector
-  Eigen::Vector3d vec;
+  /// Number of active vertices (1=point, 2=line, 3=triangle, 4=tetrahedron)
+  int nvrtx;
 };
 
 /// Calculate the distance between two convex bodies bd1 and bd2
