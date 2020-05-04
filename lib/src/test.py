@@ -1,4 +1,4 @@
-import opengjk
+import opengjkc as opengjk
 from scipy.spatial.transform import Rotation as R
 import numpy as np
 import pytest
@@ -157,9 +157,10 @@ def test_cube_distance(c0, c1):
     dx = cubes[c0][:,0].max() - cubes[c1][:,0].min()
     cube0 = cubes[c0]
 
-    for delta in [1.0, 1e-4, 1e-8, 1e-12]:
+    for delta in [1e8, 1.0, 1e-4, 1e-8, 1e-12]:
         cube1 = cubes[c1] + np.array([dx + delta, 0, 0])
         distance = opengjk.gjk(cube0, cube1)
+        print(distance, delta)
         assert(np.isclose(distance, delta))
 
 def test_random_objects():
@@ -168,4 +169,13 @@ def test_random_objects():
             for k in range(1000):    
                 arr1 = np.random.rand(i, 3)
                 arr2 = np.random.rand(j, 3)
+                opengjk.gjk(arr1, arr2) 
+
+
+def test_large_random_objects():
+    for i in range(1, 8):
+        for j in range(1, 8):
+            for k in range(1000):    
+                arr1 = 10000.0*np.random.rand(i, 3)
+                arr2 = 10000.0*np.random.rand(j, 3)
                 opengjk.gjk(arr1, arr2) 

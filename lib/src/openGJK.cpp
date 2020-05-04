@@ -27,6 +27,7 @@
 
 #include "openGJK.hpp"
 #include <Eigen/Geometry>
+#include <iomanip>
 #include <iostream>
 #include <stdexcept>
 
@@ -208,8 +209,9 @@ void S3D(Simplex& s)
   if (FacetsTest[0] + FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 4)
   {
     // All signs are equal, therefore the origin is inside the simplex
-    s.vec = s.vrtx.transpose() * B.reverse();
-    s.vec /= detM;
+    s.vec.setZero();
+    // s.vec = s.vrtx.transpose() * B.reverse();
+    // s.vec /= detM;
     s.nvrtx = 4;
     return;
   }
@@ -252,16 +254,17 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
            const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd2)
 {
   const int mk = 50; // Maximum number of iterations of the GJK algorithm
-  const double eps_rel2 = 1e-25; // Tolerance on relative distance
+  const double eps2 = 1e-17; // Tolerance
 
   // Initialise
-  Eigen::Vector3d v = bd1.row(0) - bd2.row(0);
   Simplex s;
   s.nvrtx = 1;
+  Eigen::Vector3d v = bd1.row(0) - bd2.row(0);
   s.vrtx.row(0) = v;
 
   // Begin GJK iteration
   int k;
+  double vnorm2 = 0;
   for (k = 0; k < mk; ++k)
   {
     // Support function
@@ -271,20 +274,30 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
     const Eigen::Vector3d w = bd1.row(i) - bd2.row(j);
 
     // 1st exit condition
-    const double vnorm2 = v.squaredNorm();
-    if (vnorm2 - v.dot(w) < eps_rel2)
-      break;
-
-    // 2nd exit condition - intersecting or touching
-    if (vnorm2 < eps_rel2)
+    if (k > 0 && (vnorm2 - v.dot(w)) < eps2)
       break;
 
     // Simplex size should be less than 4, or should have exited already
     if (s.nvrtx == 4)
       throw std::runtime_error("OpenGJK error: simplex limit reached");
+
     // Add new vertex to simplex
+
+    // Break if any existing points are the same as w
+    int m;
+    for (m = 0; m < s.nvrtx; ++m)
+      if ((s.vrtx.row(m).array() == w.transpose().array()).all())
+        break;
+    if (m != s.nvrtx)
+      break;
+
     s.vrtx.row(s.nvrtx) = w;
     ++s.nvrtx;
+
+    if (k > 5)
+      std::cout << "k = " << k << " s = \n[" << s.vrtx.topRows(s.nvrtx)
+                << " vnorm2 = " << vnorm2 << ", " << (vnorm2 - v.dot(w))
+                << "\n";
 
     // Invoke distance sub-algorithm
     switch (s.nvrtx)
@@ -299,11 +312,11 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
       S1D(s);
       break;
     }
-
-    // Exit condition if no change in v
-    if ((s.vec - v).squaredNorm() < 1e-30)
-      break;
     v = s.vec;
+    vnorm2 = v.squaredNorm();
+    // 2nd exit condition - intersecting or touching
+    if (vnorm2 < eps2)
+      break;
   }
   if (k == mk)
     throw std::runtime_error("OpenGJK error: max iteration limit reached");
