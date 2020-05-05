@@ -1144,16 +1144,18 @@ double csFunction(int nCoordsA, double* inCoordsA, int nCoordsB,
   return distance;
 }
 
+#include <chrono>
+#include <iostream>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 namespace py = pybind11;
 
 PYBIND11_MODULE(opengjkc, m)
 {
-  m.def("gjk",
+  m.def("gjk_timed",
         [](Eigen::Array<double, Eigen::Dynamic, 3, Eigen::RowMajor>& arr1,
            Eigen::Array<double, Eigen::Dynamic, 3, Eigen::RowMajor>& arr2)
-            -> double {
+            -> std::pair<double, double> {
           struct simplex s;
           struct bd bd1;
           struct bd bd2;
@@ -1169,8 +1171,12 @@ PYBIND11_MODULE(opengjkc, m)
             arr2_rows[i] = arr2.row(i).data();
           bd2.coord = arr2_rows.data();
 
+          auto tstart = std::chrono::system_clock::now();
           double a = gjk(bd1, bd2, &s);
+          auto tend = std::chrono::system_clock::now();
+          std::chrono::duration<double> diff = tend - tstart;
+          // std::cout << "OpenGJKc time = " << diff.count() * 1e6 << " us\n";
 
-          return a;
+          return {diff.count(), a};
         });
 }

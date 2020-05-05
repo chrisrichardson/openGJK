@@ -38,24 +38,24 @@ namespace
 Eigen::Vector3d S1D(Simplex& s)
 {
   assert(s.nvrtx == 2);
-  const Eigen::Vector3d t = s.vrtx.row(0) - s.vrtx.row(1);
+  const Eigen::RowVector3d t = s.vrtx.row(0) - s.vrtx.row(1);
 
   const double tnorm2 = t.squaredNorm();
-  if (tnorm2 > 0.0)
+  if (tnorm2 == 0.0)
+    throw std::runtime_error("t=0 in S1D");
+
+  // Project origin onto the 1D simplex - line
+  const double pt = s.vrtx.row(0).dot(t) / tnorm2;
+
+  if (pt >= 0.0 and pt <= 1.0)
   {
-    // Project origin onto the 1D simplex - line
-    const double pt = s.vrtx.row(0).dot(t) / tnorm2;
-
-    if (pt >= 0.0 and pt <= 1.0)
-    {
-      // The origin is between A and B
-      return s.vrtx.row(0).transpose() - pt * t;
-    }
-
-    // The origin is beyond A, change point
-    if (pt > 1.0)
-      s.vrtx.row(0) = s.vrtx.row(1);
+    // The origin is between A and B
+    return s.vrtx.row(0) - pt * t;
   }
+
+  // The origin is beyond A, change point
+  if (pt > 1.0)
+    s.vrtx.row(0) = s.vrtx.row(1);
 
   s.nvrtx = 1;
   return s.vrtx.row(0);
@@ -68,48 +68,40 @@ Eigen::Vector3d S2D(Simplex& s)
   assert(s.nvrtx == 3);
   const Eigen::Vector3d ac = s.vrtx.row(0) - s.vrtx.row(2);
   const Eigen::Vector3d bc = s.vrtx.row(0) - s.vrtx.row(1);
-  const Eigen::Vector3d a = s.vrtx.row(2);
+  const Eigen::Vector3d& a = s.vrtx.row(2);
 
   // Find best axis for projection
   Eigen::Vector3d n = ac.cross(bc);
+  if (n.squaredNorm() == 0.0)
+    throw std::runtime_error("Zero normal in S2D");
   const Eigen::Vector3d nu_fabs = n.cwiseAbs();
   int indexI;
   nu_fabs.maxCoeff(&indexI);
   const double nu_max = n[indexI];
 
-  Eigen::Vector3d B;
+  // Renormalise n in plane of ABC
+  n *= n.dot(a) / n.squaredNorm();
+
+  const int indexJ0 = (indexI + 1) % 3;
+  const int indexJ1 = (indexI + 2) % 3;
+  const Eigen::Vector3d W1 = s.vrtx.col(indexJ0).head(3).reverse();
+  const Eigen::Vector3d W2 = s.vrtx.col(indexJ1).head(3).reverse();
+  const Eigen::Vector3d W3 = (W1 * n[indexJ1] - W2 * n[indexJ0]);
+  Eigen::Vector3d B = W1.cross(W2);
+  B[0] += (W3[2] - W3[1]);
+  B[1] += (W3[0] - W3[2]);
+  B[2] += (W3[1] - W3[0]);
+
+  // Test if sign of ABC is equal to the signs of the auxiliary simplices
   int FacetsTest[3] = {1, 1, 1};
-
-  if (nu_max == 0.0)
-  {
-    if (ac.squaredNorm() == 0.0)
-      FacetsTest[2] = 0;
-    else
-      FacetsTest[1] = 0;
-  }
-  else
-  {
-    n.normalize();
-    const int indexJ0 = (indexI + 1) % 3;
-    const int indexJ1 = (indexI + 2) % 3;
-    const Eigen::Vector3d W1 = s.vrtx.col(indexJ0).head(3).reverse();
-    const Eigen::Vector3d W2 = s.vrtx.col(indexJ1).head(3).reverse();
-    const Eigen::Vector3d W3 = (W1 * n[indexJ1] - W2 * n[indexJ0]) * n.dot(a);
-    B = W1.cross(W2);
-    B[0] += (W3[2] - W3[1]);
-    B[1] += (W3[0] - W3[2]);
-    B[2] += (W3[1] - W3[0]);
-
-    // Test if sign of ABC is equal to the signs of the auxiliary simplices
-    for (int i = 0; i < 3; ++i)
-      FacetsTest[i] = (std::signbit(nu_max) == std::signbit(B[i]));
-  }
+  for (int i = 0; i < 3; ++i)
+    FacetsTest[i] = (std::signbit(nu_max) == std::signbit(B[i]));
 
   if ((FacetsTest[0] + FacetsTest[1] + FacetsTest[2]) == 3)
   {
     // The origin projection lays onto the triangle
     s.nvrtx = 3;
-    return n.dot(a) * n;
+    return n;
   }
 
   if (FacetsTest[1] == 0 and FacetsTest[2] == 0)
@@ -219,6 +211,7 @@ Eigen::Vector3d S3D(Simplex& s)
 
   // Either 1, 2 or 3 of ACD, ABD or ABC are closest.
   Simplex sBest;
+  sBest.nvrtx = 0;
   Eigen::Vector3d vBest;
   static const int facets[3][3] = {{0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
   double vmin = std::numeric_limits<double>::max();
@@ -244,6 +237,25 @@ Eigen::Vector3d S3D(Simplex& s)
   s = sBest;
   return vBest;
 }
+
+Eigen::Vector3d
+support(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd,
+        const Eigen::Vector3d& v)
+{
+  int i = 0;
+  double qmax = bd.row(0) * v;
+  for (int m = 1; m < bd.rows(); ++m)
+  {
+    const double q = bd.row(m) * v;
+    if (q > qmax)
+    {
+      qmax = q;
+      i = m;
+    }
+  }
+  return bd.row(i);
+}
+
 } // namespace
 //-----------------------------------------------------
 double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
@@ -265,10 +277,7 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
   for (k = 0; k < mk; ++k)
   {
     // Support function
-    Eigen::VectorXd::Index i, j;
-    (bd1 * -v).maxCoeff(&i);
-    (bd2 * v).maxCoeff(&j);
-    const Eigen::Vector3d w = bd1.row(i) - bd2.row(j);
+    const Eigen::Vector3d w = support(bd1, -v) - support(bd2, v);
 
     // 1st exit condition
     if (k > 0 && (vnorm2 - v.dot(w)) < eps2)
@@ -283,7 +292,8 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
     // Break if any existing points are the same as w
     int m;
     for (m = 0; m < s.nvrtx; ++m)
-      if ((s.vrtx.row(m).array() == w.transpose().array()).all())
+      if (s.vrtx(m, 0) == w[0] and s.vrtx(m, 1) == w[1]
+          and s.vrtx(m, 2) == w[2])
         break;
     if (m != s.nvrtx)
       break;
