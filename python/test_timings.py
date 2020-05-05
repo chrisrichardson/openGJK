@@ -32,7 +32,7 @@ def test():
                     tmin = min(tmin, distance[0])
                     tmax = max(tmax, distance[0])
                     t0 += distance[0]
-                    # assert np.isclose(distance, delta), "Error with " + str(c0) + str(c1) + " " + str(distance) + " " + str(delta)
+                    assert np.isclose(distance[1], delta), "Error with " + str(c0) + str(c1) + " " + str(distance) + " " + str(delta)
 
     print('Time mean = ',t0/64000 * 1e6 , " us")
     print('Time best = ',tmin * 1e6 , " us")
