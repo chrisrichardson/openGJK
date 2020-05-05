@@ -17,3 +17,7 @@ jobs:
       run: |
         cd python
         python3 -m pytest -s -v test.py
+    - name: Timings
+      run: |
+        cd python
+        python3 test_timings.py
