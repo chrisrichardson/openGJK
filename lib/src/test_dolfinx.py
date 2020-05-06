@@ -42,7 +42,7 @@ def test_quad_dofs():
             vertices = c_to_v.links(cell)
             nodes = vertex_to_node[vertices]
             physical_points = points[nodes]
-            distance = opengjk.gjk(physical_points, xi)
+            distance = opengjk.gjk_distance(physical_points, xi)
             # If distance close to machine precision.
             if distance < 1e-15:
                 actual_cells.append(cell)
