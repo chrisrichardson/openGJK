@@ -93,7 +93,7 @@ Eigen::Vector3d S2D(Simplex& s)
   B[2] += (W3[1] - W3[0]);
 
   // Test if sign of ABC is equal to the signs of the auxiliary simplices
-  int FacetsTest[3] = {1, 1, 1};
+  int FacetsTest[3];
   for (int i = 0; i < 3; ++i)
     FacetsTest[i] = (std::signbit(nu_max) == std::signbit(B[i]));
 
@@ -210,8 +210,7 @@ Eigen::Vector3d S3D(Simplex& s)
   }
 
   // Either 1, 2 or 3 of ACD, ABD or ABC are closest.
-  Simplex sBest;
-  sBest.nvrtx = 0;
+  Simplex sTmp[2];
   Eigen::Vector3d vBest;
   static const int facets[3][3] = {{0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
   double vmin = std::numeric_limits<double>::max();
@@ -219,22 +218,21 @@ Eigen::Vector3d S3D(Simplex& s)
   {
     if (FacetsTest[i + 1] == 0)
     {
-      Simplex sTmp;
-      sTmp.nvrtx = 3;
-      sTmp.vrtx.row(0) = s.vrtx.row(facets[i][0]);
-      sTmp.vrtx.row(1) = s.vrtx.row(facets[i][1]);
-      sTmp.vrtx.row(2) = s.vrtx.row(facets[i][2]);
-      Eigen::Vector3d vTmp = S2D(sTmp);
+      sTmp[0].nvrtx = 3;
+      sTmp[0].vrtx.row(0) = s.vrtx.row(facets[i][0]);
+      sTmp[0].vrtx.row(1) = s.vrtx.row(facets[i][1]);
+      sTmp[0].vrtx.row(2) = s.vrtx.row(facets[i][2]);
+      Eigen::Vector3d vTmp = S2D(sTmp[0]);
       const double vnorm = vTmp.squaredNorm();
       if (vnorm < vmin)
       {
         vmin = vnorm;
         vBest = vTmp;
-        sBest = sTmp;
+        sTmp[1] = sTmp[0];
       }
     }
   }
-  s = sBest;
+  s = sTmp[1];
   return vBest;
 }
 
@@ -258,12 +256,17 @@ support(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd,
 
 } // namespace
 //-----------------------------------------------------
-double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
-           const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd2)
+Eigen::Vector3d
+gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
+    const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd2)
 {
-  const int mk = 50;   // Maximum number of iterations of the GJK algorithm
-  double eps2 = 1e-25; // Tolerance
-  const double eps2_min = 1e-6; // Minimum tolerance when difficult to converge
+  const int mk = 50; // Maximum number of iterations of the GJK algorithm
+
+  // Tolerances
+  const double eps_tot = 1e-12;
+  double eps_rel = 1e-12;
+  // Minimum relative tolerance, after 10 cycles
+  const double eps_rel_min = 1e-6;
 
   // Initialise
   Simplex s;
@@ -273,21 +276,10 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
 
   // Begin GJK iteration
   int k;
-  double vnorm2 = 0;
   for (k = 0; k < mk; ++k)
   {
     // Support function
     const Eigen::Vector3d w = support(bd1, -v) - support(bd2, v);
-
-    // 1st exit condition
-    if (k > 0 && (vnorm2 - v.dot(w)) < eps2)
-      break;
-
-    // Simplex size should be less than 4, or should have exited already
-    if (s.nvrtx == 4)
-      throw std::runtime_error("OpenGJK error: simplex limit reached");
-
-    // Add new vertex to simplex
 
     // Break if any existing points are the same as w
     int m;
@@ -298,6 +290,18 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
     if (m != s.nvrtx)
       break;
 
+    // If proving hard to converge, relax tolerance
+    if (k > 10 and eps_rel < eps_rel_min)
+      eps_rel *= 10;
+
+    // 1st exit condition (v-w).v = 0
+    const double vnorm2 = v.squaredNorm();
+    const double vw = vnorm2 - v.dot(w);
+    if (vw < (eps_rel * vnorm2) or vw < eps_tot)
+      break;
+
+    // Add new vertex to simplex
+    assert(s.nvrtx != 4);
     s.vrtx.row(s.nvrtx) = w;
     ++s.nvrtx;
 
@@ -315,22 +319,13 @@ double gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
       break;
     }
 
-    vnorm2 = v.squaredNorm();
     // 2nd exit condition - intersecting or touching
-    if (vnorm2 < eps2)
+    if (v.squaredNorm() < eps_rel * eps_rel)
       break;
-
-    // Weaken condition on each iteration
-    if (k > 5 and eps2 < eps2_min)
-      eps2 *= 10;
   }
   if (k == mk)
     throw std::runtime_error("OpenGJK error: max iteration limit reached");
 
-#ifdef DEBUG
-  std::cout << "OpenGJK iterations = " << k << "\n";
-#endif
-
   // Compute and return distance
-  return v.norm();
+  return v;
 }
