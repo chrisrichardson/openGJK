@@ -266,7 +266,7 @@ gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
   const double eps_tot = 1e-12;
   double eps_rel = 1e-12;
   // Minimum relative tolerance, after 10 cycles
-  const double eps_rel_min = 1e-6;
+  // const double eps_rel_min = 1e-6;
 
   // Initialise
   Simplex s;
@@ -291,8 +291,8 @@ gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
       break;
 
     // If proving hard to converge, relax tolerance
-    if (k > 10 and eps_rel < eps_rel_min)
-      eps_rel *= 10;
+    // if (k > 10 and eps_rel < eps_rel_min)
+    //   eps_rel *= 10;
 
     // 1st exit condition (v-w).v = 0
     const double vnorm2 = v.squaredNorm();
