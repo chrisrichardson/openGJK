@@ -177,6 +177,7 @@ def test_random_objects():
 
 
 def test_large_random_objects():
+    np.random.seed(10)
     for i in range(1, 8):
         for j in range(1, 8):
             for k in range(1000):    
