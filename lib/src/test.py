@@ -173,13 +173,9 @@ def test_random_objects():
 
 
 def test_large_random_objects():
-    for s in range(1000):
-        print(s)
-        np.random.seed(0)
-        for i in range(1, 8):
-            for j in range(1, 8):
-                for k in range(1000):    
-                    arr1 = 10000.0*np.random.rand(i, 3)
-                    arr2 = 10000.0*np.random.rand(j, 3)
-                    print(arr1, arr2)
-                    opengjk.gjk_distance(arr1, arr2) 
+    for i in range(1, 8):
+        for j in range(1, 8):
+           for k in range(1000):    
+               arr1 = 10000.0*np.random.rand(i, 3)
+               arr2 = 10000.0*np.random.rand(j, 3)
+               opengjk.gjk_distance(arr1, arr2) 

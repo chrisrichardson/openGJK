@@ -68,7 +68,6 @@ Eigen::Vector3d S2D(Simplex& s)
   assert(s.nvrtx == 3);
   const Eigen::Vector3d ac = s.vrtx.row(0) - s.vrtx.row(2);
   const Eigen::Vector3d bc = s.vrtx.row(0) - s.vrtx.row(1);
-  const Eigen::Vector3d& a = s.vrtx.row(2);
 
   // Find best axis for projection
   Eigen::Vector3d n = ac.cross(bc);
@@ -79,8 +78,10 @@ Eigen::Vector3d S2D(Simplex& s)
   nu_fabs.maxCoeff(&indexI);
   const double nu_max = n[indexI];
 
+  // Barycentre of triangle
+  Eigen::Vector3d p = s.vrtx.topRows(3).colwise().sum() / 3.0;
   // Renormalise n in plane of ABC
-  n *= n.dot(a) / n.squaredNorm();
+  n *= n.dot(p) / n.squaredNorm();
 
   const int indexJ0 = (indexI + 1) % 3;
   const int indexJ1 = (indexI + 2) % 3;
@@ -265,8 +266,6 @@ gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
   // Tolerances
   const double eps_tot = 1e-12;
   double eps_rel = 1e-12;
-  // Minimum relative tolerance, after 10 cycles
-  // const double eps_rel_min = 1e-6;
 
   // Initialise
   Simplex s;
@@ -290,13 +289,10 @@ gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
     if (m != s.nvrtx)
       break;
 
-    // If proving hard to converge, relax tolerance
-    // if (k > 10 and eps_rel < eps_rel_min)
-    //   eps_rel *= 10;
-
     // 1st exit condition (v-w).v = 0
     const double vnorm2 = v.squaredNorm();
     const double vw = vnorm2 - v.dot(w);
+
     if (vw < (eps_rel * vnorm2) or vw < eps_tot)
       break;
 
