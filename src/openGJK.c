@@ -738,7 +738,7 @@ double gjk(struct bd bd1, struct bd bd2, struct simplex *s) {
       w[t] = bd1.s[t] - bd2.s[t];
     /* Test first exit condition (new point already in simplex/can't move further) */
     exeedtol_rel = (norm2(v) - dotProduct(v, w));
-    printf("k = %d %15.8g\n", k, exeedtol_rel);
+    // printf("k = %d %15.8g\n", k, exeedtol_rel);
     if ( exeedtol_rel <= (eps_rel * norm2(v)) || exeedtol_rel < eps_tot22) {
       break;
     }

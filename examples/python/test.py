@@ -1,4 +1,4 @@
-import opengjkc as opengjk
+import opengjkct as opengjk
 from scipy.spatial.transform import Rotation as R
 import numpy as np
 import pytest
