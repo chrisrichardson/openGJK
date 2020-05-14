@@ -27,6 +27,7 @@
 
 #include "openGJK.hpp"
 #include <Eigen/Geometry>
+#include <array>
 #include <iomanip>
 #include <iostream>
 #include <stdexcept>
@@ -35,39 +36,43 @@ namespace
 {
 /// @brief Finds point of minimum norm of 1-simplex. Robust, but slower,
 /// version of algorithm presented in paper.
-Eigen::Vector3d S1D(Simplex& s)
+std::pair<std::array<int, 3>, Eigen::Vector3d> S1D(const Simplex& s, int r0,
+                                                   int r1)
 {
-  assert(s.nvrtx == 2);
-  const Eigen::RowVector3d t = s.vrtx.row(0) - s.vrtx.row(1);
+  const Eigen::RowVector3d t = s.vrtx.row(r0) - s.vrtx.row(r1);
 
   const double tnorm2 = t.squaredNorm();
   if (tnorm2 == 0.0)
     throw std::runtime_error("t=0 in S1D");
 
   // Project origin onto the 1D simplex - line
-  const double pt = s.vrtx.row(0).dot(t) / tnorm2;
+  const double pt = s.vrtx.row(r0).dot(t) / tnorm2;
 
   if (pt >= 0.0 and pt <= 1.0)
   {
     // The origin is between A and B
-    return s.vrtx.row(0) - pt * t;
+    Eigen::Vector3d v = s.vrtx.row(r0) - pt * t;
+    return {{r0, r1, -1}, v};
   }
 
   // The origin is beyond A, change point
   if (pt > 1.0)
-    s.vrtx.row(0) = s.vrtx.row(1);
-
-  s.nvrtx = 1;
-  return s.vrtx.row(0);
+    return {{r1, -1, -1}, s.vrtx.row(r1)};
+  else
+    return {{r0, -1, -1}, s.vrtx.row(r0)};
 }
 
 /// @brief Finds point of minimum norm of 2-simplex. Robust, but slower,
 /// version of algorithm presented in paper.
-Eigen::Vector3d S2D(Simplex& s)
+std::pair<std::array<int, 3>, Eigen::Vector3d> S2D(Simplex& s, int r0, int r1,
+                                                   int r2)
 {
-  assert(s.nvrtx == 3);
-  const Eigen::Vector3d ac = s.vrtx.row(0) - s.vrtx.row(2);
-  const Eigen::Vector3d bc = s.vrtx.row(0) - s.vrtx.row(1);
+  Eigen::Matrix3d M;
+  M.row(0) = s.vrtx.row(r0);
+  M.row(1) = s.vrtx.row(r1);
+  M.row(2) = s.vrtx.row(r2);
+  const Eigen::Vector3d ac = M.row(0) - M.row(2);
+  const Eigen::Vector3d bc = M.row(0) - M.row(1);
 
   // Find best axis for projection
   Eigen::Vector3d n = ac.cross(bc);
@@ -79,14 +84,14 @@ Eigen::Vector3d S2D(Simplex& s)
   const double nu_max = n[indexI];
 
   // Barycentre of triangle
-  Eigen::Vector3d p = s.vrtx.topRows(3).colwise().sum() / 3.0;
+  Eigen::Vector3d p = M.colwise().sum() / 3.0;
   // Renormalise n in plane of ABC
   n *= n.dot(p) / n.squaredNorm();
 
   const int indexJ0 = (indexI + 1) % 3;
   const int indexJ1 = (indexI + 2) % 3;
-  const Eigen::Vector3d W1 = s.vrtx.col(indexJ0).head(3).reverse();
-  const Eigen::Vector3d W2 = s.vrtx.col(indexJ1).head(3).reverse();
+  const Eigen::Vector3d W1 = M.col(indexJ0).reverse();
+  const Eigen::Vector3d W2 = M.col(indexJ1).reverse();
   const Eigen::Vector3d W3 = (W1 * n[indexJ1] - W2 * n[indexJ0]);
   Eigen::Vector3d B = W1.cross(W2);
   B[0] += (W3[2] - W3[1]);
@@ -102,51 +107,50 @@ Eigen::Vector3d S2D(Simplex& s)
   {
     // The origin projection lays onto the triangle
     s.nvrtx = 3;
-    return n;
+    return {{r0, r1, r2}, n};
   }
 
-  if (FacetsTest[1] == 0 and FacetsTest[2] == 0)
+  std::array<int, 3> arrmin = {-1, -1, -1};
+  Eigen::Vector3d vmin;
+  if (FacetsTest[1] == 1 and FacetsTest[2] == 1)
   {
-    Eigen::Vector3d v, vTmp;
-    Simplex sTmp;
-    sTmp.nvrtx = 2;
-    sTmp.vrtx.row(0) = s.vrtx.row(1);
-    sTmp.vrtx.row(1) = s.vrtx.row(2);
-    vTmp = S1D(sTmp);
+    // FacetsTest[0] == 0
+    // The origin projection P faces the segment BC
+    std::tie(arrmin, vmin) = S1D(s, 0, 1);
+  }
 
-    s.nvrtx = 2;
-    s.vrtx.row(1) = s.vrtx.row(2);
-    v = S1D(s);
-
-    if (vTmp.squaredNorm() < v.squaredNorm())
+  double qmin = std::numeric_limits<double>::max();
+  for (int i = 0; i < 2; ++i)
+  {
+    if (FacetsTest[i + 1] == 0)
     {
-      s = sTmp;
-      return vTmp;
+      Eigen::Vector3d v;
+      std::array<int, 3> arr;
+      // Edge (0, 2) or (1, 2)
+      std::tie(arr, v) = S1D(s, i, 2);
+      const double q = v.squaredNorm();
+      if (q < qmin)
+      {
+        qmin = q;
+        arrmin = arr;
+        vmin = v;
+      }
     }
-    return v;
   }
 
-  if (FacetsTest[2] == 0)
+  if (arrmin[1] == -1)
   {
-    // The origin projection P faces the segment AB
-    s.nvrtx = 2;
-    s.vrtx.row(0) = s.vrtx.row(1);
-    s.vrtx.row(1) = s.vrtx.row(2);
-    return S1D(s);
+    s.nvrtx = 1;
+    s.vrtx.row(0) = s.vrtx.row(arrmin[0]);
   }
-
-  if (FacetsTest[1] == 0)
+  else
   {
-    // The origin projection P faces the segment AC
     s.nvrtx = 2;
-    s.vrtx.row(1) = s.vrtx.row(2);
-    return S1D(s);
+    s.vrtx.row(0) = s.vrtx.row(arrmin[0]);
+    s.vrtx.row(1) = s.vrtx.row(arrmin[1]);
   }
 
-  // FacetsTest[0] == 0
-  // The origin projection P faces the segment BC
-  s.nvrtx = 2;
-  return S1D(s);
+  return {arrmin, vmin};
 }
 
 /// @brief Finds point of minimum norm of 3-simplex. Robust, but slower,
@@ -207,7 +211,9 @@ Eigen::Vector3d S3D(Simplex& s)
   {
     // The origin projection P faces the facet BCD
     s.nvrtx = 3;
-    return S2D(s);
+    Eigen::Vector3d v;
+    std::array<int, 3> arr;
+    std::tie(arr, v) = S2D(s, 0, 1, 2);
   }
 
   // Either 1, 2 or 3 of ACD, ABD or ABC are closest.
@@ -223,7 +229,9 @@ Eigen::Vector3d S3D(Simplex& s)
       sTmp[0].vrtx.row(0) = s.vrtx.row(facets[i][0]);
       sTmp[0].vrtx.row(1) = s.vrtx.row(facets[i][1]);
       sTmp[0].vrtx.row(2) = s.vrtx.row(facets[i][2]);
-      Eigen::Vector3d vTmp = S2D(sTmp[0]);
+      std::array<int, 3> arr;
+      Eigen::Vector3d vTmp;
+      std::tie(arr, vTmp) = S2D(sTmp[0], 0, 1, 2);
       const double vnorm = vTmp.squaredNorm();
       if (vnorm < vmin)
       {
@@ -301,6 +309,7 @@ gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
     s.vrtx.row(s.nvrtx) = w;
     ++s.nvrtx;
 
+    std::array<int, 3> arr;
     // Invoke distance sub-algorithm
     switch (s.nvrtx)
     {
@@ -308,10 +317,21 @@ gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
       v = S3D(s);
       break;
     case 3:
-      v = S2D(s);
+      std::tie(arr, v) = S2D(s, 0, 1, 2);
       break;
     case 2:
-      v = S1D(s);
+      std::tie(arr, v) = S1D(s, 0, 1);
+      if (arr[1] == -1)
+      {
+        s.nvrtx = 1;
+        s.vrtx.row(0) = s.vrtx.row(arr[0]);
+      }
+      else
+      {
+        s.nvrtx = 2;
+        s.vrtx.row(0) = s.vrtx.row(arr[0]);
+        s.vrtx.row(1) = s.vrtx.row(arr[1]);
+      }
       break;
     }
 
