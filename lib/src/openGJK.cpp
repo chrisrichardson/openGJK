@@ -76,56 +76,54 @@ S2D(const Eigen::Matrix<double, 4, 3, Eigen::RowMajor>& s, int r0, int r1,
   const Eigen::Vector3d bc = M.row(0) - M.row(1);
 
   // Find best axis for projection
-  Eigen::Vector3d nvrtx = ac.cross(bc);
-  if (nvrtx.squaredNorm() == 0.0)
+  Eigen::Vector3d n = ac.cross(bc);
+  if (n.squaredNorm() == 0.0)
     throw std::runtime_error("Zero normal in S2D");
-  const Eigen::Vector3d nu_fabs = nvrtx.cwiseAbs();
+  const Eigen::Vector3d nu_fabs = n.cwiseAbs();
   int indexI;
   nu_fabs.maxCoeff(&indexI);
-  const double nu_max = nvrtx[indexI];
+  const double nu_max = n[indexI];
 
   // Barycentre of triangle
   Eigen::Vector3d p = M.colwise().sum() / 3.0;
   // Renormalise nvrtx in plane of ABC
-  nvrtx *= nvrtx.dot(p) / nvrtx.squaredNorm();
+  n *= n.dot(p) / n.squaredNorm();
 
   const int indexJ0 = (indexI + 1) % 3;
   const int indexJ1 = (indexI + 2) % 3;
   const Eigen::Vector3d W1 = M.col(indexJ0).reverse();
   const Eigen::Vector3d W2 = M.col(indexJ1).reverse();
-  const Eigen::Vector3d W3 = (W1 * nvrtx[indexJ1] - W2 * nvrtx[indexJ0]);
+  const Eigen::Vector3d W3 = (W1 * n[indexJ1] - W2 * n[indexJ0]);
   Eigen::Vector3d B = W1.cross(W2);
   B[0] += (W3[2] - W3[1]);
   B[1] += (W3[0] - W3[2]);
   B[2] += (W3[1] - W3[0]);
 
   // Test if sign of ABC is equal to the signs of the auxiliary simplices
-  int FacetsTest[3];
+  std::array<bool, 3> FacetsTest;
   for (int i = 0; i < 3; ++i)
     FacetsTest[i] = (std::signbit(nu_max) == std::signbit(B[i]));
 
-  if ((FacetsTest[0] + FacetsTest[1] + FacetsTest[2]) == 3)
+  if (FacetsTest[0] and FacetsTest[1] and FacetsTest[2])
   {
     // The origin projection lays onto the triangle
-    return {{r0, r1, r2, -1}, nvrtx};
+    return {{r0, r1, r2, -1}, n};
   }
 
   std::array<int, 4> arrmin = {-1, -1, -1, -1};
   Eigen::Vector3d vmin = {0, 0, 0};
-  if (FacetsTest[1] == 1 and FacetsTest[2] == 1)
-  {
-    // FacetsTest[0] == 0
-    // The origin projection P faces the segment BC
+
+  // Test if the origin projection P faces the segment BC
+  if (FacetsTest[1] and FacetsTest[2])
     std::tie(arrmin, vmin) = S1D(s, r0, r1);
-  }
 
   double qmin = std::numeric_limits<double>::max();
-  if (FacetsTest[1] == 0)
+  if (FacetsTest[1] == false)
   {
     std::tie(arrmin, vmin) = S1D(s, r0, r2);
     qmin = vmin.squaredNorm();
   }
-  if (FacetsTest[2] == 0)
+  if (FacetsTest[2] == false)
   {
     auto [arr, v] = S1D(s, r1, r2);
     if (v.squaredNorm() < qmin)
@@ -150,46 +148,19 @@ S3D(const Eigen::Matrix<double, 4, 3, Eigen::RowMajor>& s)
   B[1] = -s.row(3) * W1;
   B[2] = s.row(0) * W2;
   B[3] = -s.row(1) * W2;
-
   double detM = B.sum();
 
   // Test if sign of ABCD is equal to the signs of the auxiliary simplices
-  const double eps = 0;
-  int FacetsTest[4] = {1, 1, 1, 1};
-  if (std::abs(detM) < eps)
-  {
-    Eigen::Vector4d Babs = B.cwiseAbs();
-    if (Babs[2] < eps and Babs[3] < eps)
-      FacetsTest[1] = 0; // A = B. Test only ACD
-    else if (Babs[1] < eps and Babs[3] < eps)
-      FacetsTest[2] = 0; // A = C. Test only ABD
-    else if (Babs[1] < eps and Babs[2] < eps)
-      FacetsTest[3] = 0; // A = D. Test only ABC
-    else if (Babs[0] < eps and Babs[3] < eps)
-      FacetsTest[1] = 0; // B = C. Test only ACD
-    else if (Babs[0] < eps and Babs[2] < eps)
-      FacetsTest[1] = 0; // B = D. Test only ACD
-    else if (Babs[0] < eps and Babs[1] < eps)
-      FacetsTest[2] = 0; // C = D. Test only ABD
-    else
-    {
-      for (int i = 0; i < 4; i++)
-        FacetsTest[i] = 0; // Any other case. Test ABC, ABD, ACD
-    }
-  }
-  else
-  {
-    for (int i = 0; i < 4; ++i)
-      FacetsTest[i] = (std::signbit(detM) == std::signbit(B[i]));
-  }
+  std::array<bool, 4> FacetsTest;
+  for (int i = 0; i < 4; ++i)
+    FacetsTest[i] = (std::signbit(detM) == std::signbit(B[i]));
 
-  if (FacetsTest[0] + FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 4)
+  if (FacetsTest[0] and FacetsTest[1] and FacetsTest[2] and FacetsTest[3])
   {
     // All signs are equal, therefore the origin is inside the simplex
     return {{0, 1, 2, 3}, Eigen::Vector3d::Zero()};
   }
-
-  if (FacetsTest[1] + FacetsTest[2] + FacetsTest[3] == 3)
+  else if (FacetsTest[1] and FacetsTest[2] and FacetsTest[3])
   {
     // The origin projection P faces the facet BCD
     return S2D(s, 0, 1, 2);
@@ -202,7 +173,7 @@ S3D(const Eigen::Matrix<double, 4, 3, Eigen::RowMajor>& s)
   double qmin = std::numeric_limits<double>::max();
   for (int i = 0; i < 3; ++i)
   {
-    if (FacetsTest[i + 1] == 0)
+    if (FacetsTest[i + 1] == false)
     {
       auto [arr, v] = S2D(s, facets[i][0], facets[i][1], facets[i][2]);
 
@@ -242,22 +213,22 @@ Eigen::Vector3d
 gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
     const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd2)
 {
-  const int mk = 50; // Maximum number of iterations of the GJK algorithm
+  const int maxk = 50; // Maximum number of iterations of the GJK algorithm
 
   // Tolerances
   const double eps_tot = 1e-12;
-  double eps_rel = 1e-12;
+  const double eps_rel = 1e-12;
 
   // Initialise
   Eigen::Matrix<double, 4, 3, Eigen::RowMajor> s;
   int nvrtx = 1;
-  std::array<int, 4> arr = {0, -1, -1, -1};
+  std::array<int, 4> pt_index = {0, -1, -1, -1};
   Eigen::Vector3d v = bd1.row(0) - bd2.row(0);
   s.row(0) = v;
 
   // Begin GJK iteration
   int k;
-  for (k = 0; k < mk; ++k)
+  for (k = 0; k < maxk; ++k)
   {
     // Support function
     const Eigen::Vector3d w = support(bd1, -v) - support(bd2, v);
@@ -273,7 +244,6 @@ gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
     // 1st exit condition (v-w).v = 0
     const double vnorm2 = v.squaredNorm();
     const double vw = vnorm2 - v.dot(w);
-
     if (vw < (eps_rel * vnorm2) or vw < eps_tot)
       break;
 
@@ -282,32 +252,26 @@ gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
     ++nvrtx;
 
     // Invoke distance sub-algorithm
-    switch (nvrtx)
-    {
-    case 4:
-      std::tie(arr, v) = S3D(s);
-      break;
-    case 3:
-      std::tie(arr, v) = S2D(s, 0, 1, 2);
-      break;
-    case 2:
-      std::tie(arr, v) = S1D(s, 0, 1);
-      break;
-    }
+    if (nvrtx == 4)
+      std::tie(pt_index, v) = S3D(s);
+    else if (nvrtx == 3)
+      std::tie(pt_index, v) = S2D(s, 0, 1, 2);
+    else
+      std::tie(pt_index, v) = S1D(s, 0, 1);
 
     // Rebuild s
     for (nvrtx = 0; nvrtx < 3; ++nvrtx)
     {
-      if (arr[nvrtx] == -1)
+      if (pt_index[nvrtx] == -1)
         break;
-      s.row(nvrtx) = s.row(arr[nvrtx]);
+      s.row(nvrtx) = s.row(pt_index[nvrtx]);
     }
 
     // 2nd exit condition - intersecting or touching
     if (v.squaredNorm() < eps_rel * eps_rel)
       break;
   }
-  if (k == mk)
+  if (k == maxk)
     throw std::runtime_error("OpenGJK error: max iteration limit reached");
 
   // Compute and return distance
