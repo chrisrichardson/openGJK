@@ -138,18 +138,6 @@ std::pair<std::array<int, 3>, Eigen::Vector3d> S2D(Simplex& s, int r0, int r1,
     }
   }
 
-  if (arrmin[1] == -1)
-  {
-    s.nvrtx = 1;
-    s.vrtx.row(0) = s.vrtx.row(arrmin[0]);
-  }
-  else
-  {
-    s.nvrtx = 2;
-    s.vrtx.row(0) = s.vrtx.row(arrmin[0]);
-    s.vrtx.row(1) = s.vrtx.row(arrmin[1]);
-  }
-
   return {arrmin, vmin};
 }
 
@@ -214,6 +202,14 @@ Eigen::Vector3d S3D(Simplex& s)
     Eigen::Vector3d v;
     std::array<int, 3> arr;
     std::tie(arr, v) = S2D(s, 0, 1, 2);
+    int n = 0;
+    for (n = 0; n < 3; ++n)
+    {
+      if (arr[n] == -1)
+        break;
+      s.vrtx.row(n) = s.vrtx.row(arr[n]);
+    }
+    s.nvrtx = n;
   }
 
   // Either 1, 2 or 3 of ACD, ABD or ABC are closest.
@@ -232,6 +228,15 @@ Eigen::Vector3d S3D(Simplex& s)
       std::array<int, 3> arr;
       Eigen::Vector3d vTmp;
       std::tie(arr, vTmp) = S2D(sTmp[0], 0, 1, 2);
+      int n = 0;
+      for (n = 0; n < 3; ++n)
+      {
+        if (arr[n] == -1)
+          break;
+        sTmp[0].vrtx.row(n) = sTmp[0].vrtx.row(arr[n]);
+      }
+      sTmp[0].nvrtx = n;
+
       const double vnorm = vTmp.squaredNorm();
       if (vnorm < vmin)
       {
@@ -310,6 +315,7 @@ gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
     ++s.nvrtx;
 
     std::array<int, 3> arr;
+    int n = 0;
     // Invoke distance sub-algorithm
     switch (s.nvrtx)
     {
@@ -318,20 +324,23 @@ gjk(const Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>& bd1,
       break;
     case 3:
       std::tie(arr, v) = S2D(s, 0, 1, 2);
+      for (n = 0; n < 3; ++n)
+      {
+        if (arr[n] == -1)
+          break;
+        s.vrtx.row(n) = s.vrtx.row(arr[n]);
+      }
+      s.nvrtx = n;
       break;
     case 2:
       std::tie(arr, v) = S1D(s, 0, 1);
-      if (arr[1] == -1)
+      for (n = 0; n < 3; ++n)
       {
-        s.nvrtx = 1;
-        s.vrtx.row(0) = s.vrtx.row(arr[0]);
+        if (arr[n] == -1)
+          break;
+        s.vrtx.row(n) = s.vrtx.row(arr[n]);
       }
-      else
-      {
-        s.nvrtx = 2;
-        s.vrtx.row(0) = s.vrtx.row(arr[0]);
-        s.vrtx.row(1) = s.vrtx.row(arr[1]);
-      }
+      s.nvrtx = n;
       break;
     }
 
